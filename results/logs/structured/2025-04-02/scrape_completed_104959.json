@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-04-02T10:49:59.878997",
+  "event_type": "scrape_completed",
+  "data": {
+    "source": "yews.news",
+    "articles_processed": 0,
+    "images_downloaded": 30,
+    "execution_time_seconds": 18.355704,
+    "article_dates": []
+  }
+}

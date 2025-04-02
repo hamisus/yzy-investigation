@@ -1,0 +1,12 @@
+{
+  "file_size": 683589667,
+  "data_offset": 1471966650,
+  "dib_header_size": 1148372090,
+  "width": 832597102,
+  "height": 2280820025,
+  "bits_per_pixel": 20502,
+  "compression": "Unknown (1671725700)",
+  "extra_data_size": 323594546,
+  "extra_data_error": "division by zero",
+  "valid": true
+}

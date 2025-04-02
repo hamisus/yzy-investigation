@@ -1,0 +1,1433 @@
+{
+  "file_name": "image_01_lsb_decoded.bin",
+  "file_size": 132707,
+  "file_hash": {
+    "md5": "edf9254fd3dae23e74bff32259ea8c0b"
+  },
+  "analysis_timestamp": 1743589852.985449,
+  "file_signatures": [
+    {
+      "position": 2320,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 8752,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 11056,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 17488,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 20032,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 23440,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 26992,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 28864,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 32128,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 35008,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 37120,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 37696,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 45088,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 49216,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 50896,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 54448,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 55456,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 55888,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 68704,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 71920,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 73360,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 75520,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 80320,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 81712,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 85168,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 88480,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 91696,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 97072,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 97648,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 100864,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 106432,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 109408,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 109888,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 116800,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 120688,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 121744,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 122800,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 124192,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    },
+    {
+      "position": 128944,
+      "signature": "feff",
+      "type": "UTF-16BE",
+      "description": "UTF-16 big-endian text",
+      "location": "embedded"
+    }
+  ],
+  "byte_frequency": {
+    "entropy": 4.597015680147767,
+    "max_entropy": 8.0,
+    "entropy_percentage": 57.46269600184709,
+    "most_common_bytes": [
+      [
+        0,
+        14107,
+        10.63018529542526
+      ],
+      [
+        255,
+        13874,
+        10.454610532978666
+      ],
+      [
+        248,
+        5677,
+        4.277845177722351
+      ],
+      [
+        192,
+        5603,
+        4.222083236001115
+      ],
+      [
+        3,
+        5600,
+        4.219822616742146
+      ],
+      [
+        31,
+        5554,
+        4.185159788104621
+      ],
+      [
+        224,
+        5535,
+        4.170842532797818
+      ],
+      [
+        56,
+        5496,
+        4.141454482431221
+      ],
+      [
+        227,
+        5491,
+        4.137686783666272
+      ],
+      [
+        199,
+        5479,
+        4.128644306630396
+      ]
+    ],
+    "least_common_bytes": [
+      [
+        126,
+        2669,
+        2.0111976007294268
+      ],
+      [
+        14,
+        2673,
+        2.0142117597413853
+      ],
+      [
+        1,
+        2738,
+        2.0631918436857135
+      ],
+      [
+        127,
+        2741,
+        2.0654524629446827
+      ],
+      [
+        240,
+        2748,
+        2.0707272412156104
+      ],
+      [
+        254,
+        2752,
+        2.073741400227569
+      ],
+      [
+        113,
+        2757,
+        2.0775090989925173
+      ],
+      [
+        128,
+        2758,
+        2.078262638745507
+      ],
+      [
+        129,
+        2778,
+        2.0933334338053005
+      ],
+      [
+        142,
+        2781,
+        2.0955940530642696
+      ]
+    ],
+    "zero_bytes_percentage": 10.63018529542526,
+    "printable_ascii_percentage": 14.38733450383175,
+    "data_type_guess": "Structured binary data"
+  },
+  "repeating_patterns": [
+    {
+      "pattern_hex": "00000000",
+      "pattern_length": 4,
+      "occurrences": 21,
+      "positions": [
+        440,
+        8392,
+        8393,
+        10944,
+        15723,
+        18087,
+        18120,
+        20489,
+        22935,
+        22936
+      ]
+    },
+    {
+      "pattern_hex": "e03f801f",
+      "pattern_length": 4,
+      "occurrences": 19,
+      "positions": [
+        35,
+        1904,
+        4571,
+        7757,
+        9569,
+        10310,
+        12254,
+        17885,
+        19361,
+        19370
+      ]
+    },
+    {
+      "pattern_hex": "f87f1cff",
+      "pattern_length": 4,
+      "occurrences": 19,
+      "positions": [
+        420,
+        2106,
+        3609,
+        6879,
+        8643,
+        9522,
+        9768,
+        18999,
+        19344,
+        24924
+      ]
+    },
+    {
+      "pattern_hex": "1fc0ff1f",
+      "pattern_length": 4,
+      "occurrences": 19,
+      "positions": [
+        2399,
+        8351,
+        9029,
+        13625,
+        30026,
+        31562,
+        31808,
+        36557,
+        38369,
+        40475
+      ]
+    },
+    {
+      "pattern_hex": "000e1c38",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        669,
+        11094,
+        11889,
+        13389,
+        15936,
+        16641,
+        17304,
+        21570,
+        24957,
+        25275
+      ]
+    },
+    {
+      "pattern_hex": "ff3f8003",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        887,
+        2717,
+        7976,
+        14411,
+        15647,
+        19241,
+        20093,
+        20636,
+        21146,
+        22364
+      ]
+    },
+    {
+      "pattern_hex": "c78fff07",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        1407,
+        1974,
+        6840,
+        7641,
+        9579,
+        14232,
+        17241,
+        17610,
+        22206,
+        23898
+      ]
+    },
+    {
+      "pattern_hex": "e3388ee3",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        3560,
+        7085,
+        7829,
+        8042,
+        8303,
+        11135,
+        13577,
+        13613,
+        14669,
+        15812
+      ]
+    },
+    {
+      "pattern_hex": "fc38701c",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        4355,
+        6908,
+        7265,
+        12686,
+        14522,
+        14903,
+        19709,
+        22985,
+        27248,
+        30536
+      ]
+    },
+    {
+      "pattern_hex": "03000e1c",
+      "pattern_length": 4,
+      "occurrences": 18,
+      "positions": [
+        13184,
+        13388,
+        14678,
+        16091,
+        22475,
+        24956,
+        27920,
+        31763,
+        37319,
+        41378
+      ]
+    },
+    {
+      "pattern_hex": "3f7e00f8",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        435,
+        2145,
+        2403,
+        2913,
+        8397,
+        8640,
+        9183,
+        13425,
+        18612,
+        20208
+      ]
+    },
+    {
+      "pattern_hex": "ff81e3f8",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        486,
+        2244,
+        2964,
+        4029,
+        4452,
+        5847,
+        6378,
+        9762,
+        19488,
+        19581
+      ]
+    },
+    {
+      "pattern_hex": "e038f01f",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        587,
+        7079,
+        7499,
+        10109,
+        10724,
+        12851,
+        23135,
+        26231,
+        30338,
+        32699
+      ]
+    },
+    {
+      "pattern_hex": "e3c07fe0",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        710,
+        1070,
+        11222,
+        11960,
+        11993,
+        12428,
+        14111,
+        20855,
+        20861,
+        23153
+      ]
+    },
+    {
+      "pattern_hex": "1cf80100",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        1325,
+        2099,
+        4865,
+        10640,
+        10703,
+        13652,
+        18929,
+        22535,
+        24275,
+        26135
+      ]
+    },
+    {
+      "pattern_hex": "c0ff1f3f",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        2400,
+        3342,
+        6771,
+        8031,
+        8352,
+        12072,
+        13905,
+        14430,
+        29415,
+        31809
+      ]
+    },
+    {
+      "pattern_hex": "fc00f01f",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        3716,
+        4700,
+        9242,
+        10910,
+        11606,
+        11738,
+        13586,
+        16541,
+        18758,
+        25133
+      ]
+    },
+    {
+      "pattern_hex": "3ff0033f",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        5331,
+        5358,
+        8340,
+        10971,
+        13422,
+        18027,
+        21414,
+        25923,
+        26061,
+        30528
+      ]
+    },
+    {
+      "pattern_hex": "07701c07",
+      "pattern_length": 4,
+      "occurrences": 17,
+      "positions": [
+        7908,
+        8412,
+        8703,
+        9582,
+        10398,
+        14364,
+        17433,
+        21981,
+        24372,
+        32922
+      ]
+    },
+    {
+      "pattern_hex": "38f003ff",
+      "pattern_length": 4,
+      "occurrences": 16,
+      "positions": [
+        177,
+        5469,
+        6249,
+        7128,
+        13461,
+        14280,
+        14589,
+        14988,
+        18561,
+        19521
+      ]
+    }
+  ],
+  "text_decodings": {},
+  "transformations": {
+    "inverted_bits_sample": "ff8fe30070fcffff1fc00ffc07801f3870fc380e",
+    "xor_operations": {
+      "xor_0xff_sample": "ff8fe30070fcffff1fc00ffc07801f3870fc380e",
+      "xor_0xff_signatures": [
+        {
+          "position": 496,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 3040,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 5008,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 8944,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 11488,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 11728,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 12016,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 12736,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 14992,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 17344,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 18352,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 19264,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 19936,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 22144,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 28528,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 29488,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 29824,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 31216,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 31984,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 36784,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 39088,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 39472,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 39712,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 40144,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 40432,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 43024,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 44512,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 48016,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 51088,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 52960,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 59728,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 61024,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 68992,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 72352,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 72928,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 73024,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 74656,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 76000,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 77248,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 80704,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 83632,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 86992,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 98512,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 98752,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 99280,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 103504,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 113248,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 117088,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 118672,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 119488,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 119632,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 120928,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 122992,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 127600,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 128848,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 129376,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        }
+      ],
+      "xor_0x55_sample": "552549aada565555b56aa556ad2ab592da5692a4",
+      "xor_0xaa_sample": "aadab65525a9aaaa4a955aa952d54a6d25a96d5b",
+      "xor_0x00_sample": "00701cff8f030000e03ff003f87fe0c78f03c7f1",
+      "xor_0x00_signatures": [
+        {
+          "position": 2320,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 8752,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 11056,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 17488,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 20032,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 23440,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 26992,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 28864,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 32128,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 35008,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 37120,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 37696,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 45088,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 49216,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 50896,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 54448,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 55456,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 55888,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 68704,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 71920,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 73360,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 75520,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 80320,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 81712,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 85168,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 88480,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 91696,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 97072,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 97648,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 100864,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 106432,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 109408,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 109888,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 116800,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 120688,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 121744,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 122800,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 124192,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        },
+        {
+          "position": 128944,
+          "signature": "feff",
+          "type": "UTF-16BE",
+          "description": "UTF-16 big-endian text",
+          "location": "embedded"
+        }
+      ]
+    },
+    "bit_rotation": {
+      "rotate_left_1_sample": "00e038ff1f060000c17ee106f1fec18f1f068fe3",
+      "rotate_right_1_sample": "00380effc7810000709f78817cbf70e3c781e3f8",
+      "rotate_left_2_sample": "00c170ff3e0c000083fcc30ce3fd831f3e0c1fc7",
+      "rotate_right_2_sample": "001c07ffe3c0000038cf3cc03edf38f1e3c0f17c",
+      "rotate_left_4_sample": "0007c1fff83000000ef30f308ff70e7cf8307c1f",
+      "rotate_right_4_sample": "0007c1fff83000000ef30f308ff70e7cf8307c1f"
+    }
+  },
+  "steganography_analysis": {
+    "lsb_analysis": {
+      "lsb_0_percentage": 50.06292056937463,
+      "lsb_1_percentage": 49.93707943062537,
+      "lsb_bias": 0.06292056937463286,
+      "potential_lsb_stego": true
+    },
+    "lsb_bit_stream_sample": "0001110001010101111110000100010110101011001010100101101100000110101010001111110011111010000111000010"
+  }
+}
