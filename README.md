@@ -57,8 +57,39 @@ python -m yzy_investigation.main scrape-yews --output-dir ./custom_output
 
 ```bash
 # Basic usage
+python -m yzy_investigation.main image-crack --input-dir data/raw/yews/2025-03-27
+
+# With specific date
 python -m yzy_investigation.main image-crack --input-dir "data/raw/yews/2025-03-27"
+
+# With custom output directory
+python -m yzy_investigation.main image-crack --input-dir data/raw/yews/2025-03-27 --output-dir ./custom_output
 ```
+
+### Steganography Analysis
+
+The stego analysis project provides lower-level tools for analyzing images using Aletheia and other steganography detection techniques.
+
+```bash
+# Analyze a single image
+python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg
+
+# Analyze with custom keywords (uses image_cracking project's keywords)
+python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg --use-keywords
+
+# Analyze multiple images in a directory
+python -m yzy_investigation.projects.stego_analysis.stego_analyzer batch path/to/directory
+
+# Save results to a file
+python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg -o results.json
+
+# Specify file extensions for batch analysis
+python -m yzy_investigation.projects.stego_analysis.stego_analyzer batch path/to/directory -e jpg png
+```
+
+Note: The stego analysis project requires additional system dependencies:
+- On macOS: `brew install octave imagemagick steghide`
+- On Debian/Ubuntu: `sudo apt-get install octave octave-image octave-signal octave-nan liboctave-dev imagemagick steghide outguess`
 
 ### View Available Commands
 
