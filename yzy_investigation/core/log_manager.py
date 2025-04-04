@@ -5,7 +5,62 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+
+def setup_logging(
+    module_name: str,
+    log_level: int = logging.INFO,
+    log_dir: Optional[Union[str, Path]] = None,
+    log_to_console: bool = True
+) -> logging.Logger:
+    """
+    Set up logging configuration for a module.
+    
+    Args:
+        module_name: Name of the module for the logger
+        log_level: Logging level (default: INFO)
+        log_dir: Directory for log files (default: results/logs)
+        log_to_console: Whether to log to console
+        
+    Returns:
+        Configured logger instance
+    """
+    # Ensure log directory exists
+    log_dir_path = Path(log_dir) if log_dir else Path("results/logs")
+    log_dir_path.mkdir(parents=True, exist_ok=True)
+    
+    # Create log filename with timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    log_file = log_dir_path / f"{module_name}_{timestamp}.log"
+    
+    # Configure logger
+    logger = logging.getLogger(f"yzy_investigation.{module_name}")
+    logger.setLevel(log_level)
+    
+    # Remove any existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create file handler
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(log_level)
+    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+    
+    # Create console handler if requested
+    if log_to_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+        logger.addHandler(console_handler)
+    
+    logger.info(f"Logging set up for {module_name}")
+    logger.info(f"Log file: {log_file}")
+    
+    return logger
 
 
 class LogManager:

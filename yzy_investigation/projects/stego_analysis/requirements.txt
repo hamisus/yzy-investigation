@@ -1,0 +1,4 @@
+git+https://github.com/daniellerch/aletheia
+numpy
+matplotlib
+pillow 

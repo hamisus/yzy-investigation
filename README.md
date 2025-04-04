@@ -21,7 +21,7 @@ yzy-investigation/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/yzy-investigation.git
+git clone https://github.com/hamisus/yzy-investigation.git
 cd yzy-investigation
 ```
 

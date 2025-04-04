@@ -10,7 +10,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 # Sub-project specific settings
-PUZZLE_CRACKING = {
+IMAGE_CRACKING = {
     "supported_formats": [".txt", ".png", ".jpg", ".jpeg"],
     "max_file_size": 10 * 1024 * 1024,  # 10MB
 }
