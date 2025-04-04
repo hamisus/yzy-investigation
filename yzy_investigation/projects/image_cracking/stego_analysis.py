@@ -37,28 +37,51 @@ def make_json_serializable(data: Any) -> Any:
     Returns:
         JSON serializable version of the data
     """
+    if data is None:
+        return None
+        
+    # Handle numpy types first
+    if hasattr(data, 'dtype'):
+        # Handle numpy boolean types explicitly
+        if str(data.dtype).startswith('bool'):  # More robust check for boolean types
+            return bool(data)
+        # Handle other numpy types
+        elif np.issubdtype(data.dtype, np.integer):
+            return int(data)
+        elif np.issubdtype(data.dtype, np.floating):
+            return float(data)
+        elif isinstance(data, np.ndarray):
+            return [make_json_serializable(x) for x in data.tolist()]
+    
+    # Handle standard Python containers
     if isinstance(data, dict):
-        return {k: make_json_serializable(v) for k, v in data.items()}
+        return {str(k): make_json_serializable(v) for k, v in data.items()}
     elif isinstance(data, (list, tuple)):
         return [make_json_serializable(item) for item in data]
-    elif isinstance(data, np.ndarray):
-        return data.tolist()
-    elif isinstance(data, (np.int32, np.int64, np.uint32, np.uint64)):
-        return int(data)
-    elif isinstance(data, (np.float32, np.float64)):
-        return float(data)
+    elif isinstance(data, set):
+        return [make_json_serializable(item) for item in sorted(data)]
     elif isinstance(data, (bytes, bytearray)):
         return {
             "type": "binary",
             "encoding": "base64",
             "data": base64.b64encode(data).decode('ascii')
         }
+    elif isinstance(data, bool):  # Handle Python bool
+        return bool(data)
+    elif isinstance(data, (int, float)):
+        return data
     elif hasattr(data, '__class__') and data.__class__.__name__ == 'IFDRational':
         return float(data)
     elif hasattr(data, 'isoformat'):  # Handle date/datetime
         return data.isoformat()
+    elif hasattr(data, 'to_dict'):  # Handle objects with to_dict method
+        return make_json_serializable(data.to_dict())
     else:
-        return data
+        try:
+            # Try to convert to string if all else fails
+            return str(data)
+        except Exception:
+            return None
 
 
 class StegStrategy(ABC):
@@ -152,6 +175,8 @@ class StegAnalysisResult:
         self.image_name = image_path.name
         self.strategy_results: Dict[str, Dict[str, Any]] = {}
         self.has_hidden_data: bool = False
+        self.combined_assessment: Optional[Dict[str, Any]] = None
+        self.potential_false_positive: bool = False
     
     def add_strategy_result(self, strategy_name: str, detected: bool, data: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -170,19 +195,19 @@ class StegAnalysisResult:
             data = self._make_json_serializable(data)
             
         self.strategy_results[strategy_name] = {
-            "detected": detected,
+            "detected": bool(detected),  # Explicitly convert to Python bool
             "data": data or {}
         }
     
-    def _make_json_serializable(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _make_json_serializable(self, data: Any) -> Any:
         """
-        Convert a dictionary to be JSON serializable by handling binary data.
+        Convert data to be JSON serializable.
         
         Args:
-            data: Dictionary to convert
+            data: Data to convert
             
         Returns:
-            JSON serializable dictionary
+            JSON serializable version of the data
         """
         return make_json_serializable(data)
     
@@ -193,13 +218,24 @@ class StegAnalysisResult:
         Returns:
             Dictionary representation of the result
         """
-        # Ensure all data is JSON serializable, including nested data
-        return make_json_serializable({
+        # Create base dictionary with explicit bool conversions
+        result_dict = {
             "image_path": str(self.image_path),
             "image_name": self.image_name,
-            "has_hidden_data": self.has_hidden_data,
-            "strategy_results": self.strategy_results
-        })
+            "has_hidden_data": bool(self.has_hidden_data),
+            "strategy_results": self._make_json_serializable(self.strategy_results)
+        }
+        
+        # Add combined assessment if available
+        if self.combined_assessment is not None:
+            result_dict["combined_assessment"] = self._make_json_serializable(self.combined_assessment)
+            
+        # Add potential false positive flag if true
+        if self.potential_false_positive:
+            result_dict["potential_false_positive"] = bool(self.potential_false_positive)
+            
+        # Final pass to ensure everything is serializable
+        return self._make_json_serializable(result_dict)
 
 
 class StegAnalysisPipeline(BasePipeline):
@@ -314,14 +350,35 @@ class StegAnalysisPipeline(BasePipeline):
         """
         self.logger.info(f"Analyzing image: {image_path.name}")
         result = StegAnalysisResult(image_path)
+        strategy_results = {}
+        
+        # For JPEG images, determine appropriate strategies
+        is_jpeg = image_path.suffix.lower() in ['.jpg', '.jpeg', '.jpe', '.jfif']
         
         for strategy_class in self.strategies:
             strategy = strategy_class()
+            
+            # Skip CustomRgbEncodingStrategy for JPEG files - it's inefficient and ineffective
+            if is_jpeg and strategy.name == "custom_rgb_encoding_strategy":
+                self.logger.info(f"Skipping {strategy.name} for JPEG image {image_path.name} (not applicable)")
+                result.add_strategy_result(strategy.name, False, {
+                    "skipped": True, 
+                    "reason": "Strategy not applicable to JPEG images"
+                })
+                continue
+                
             self.logger.info(f"Applying strategy {strategy.name} to {image_path.name}")
             
             try:
                 strategy.set_output_dir(self.output_path)
                 detected, data = strategy.analyze(image_path)
+                
+                # Store results for multi-factor scoring
+                strategy_results[strategy.name] = {
+                    "detected": detected,
+                    "data": data or {}
+                }
+                
                 result.add_strategy_result(strategy.name, detected, data)
                 
                 if detected:
@@ -332,6 +389,27 @@ class StegAnalysisPipeline(BasePipeline):
             except Exception as e:
                 self.logger.error(f"Error applying strategy {strategy.name} to {image_path.name}: {e}")
                 result.add_strategy_result(strategy.name, False, {"error": str(e)})
+        
+        # Apply multi-factor scoring if we have more than one strategy result
+        if len(strategy_results) > 1:
+            try:
+                from yzy_investigation.projects.image_cracking.stego_strategies import FindingValidator
+                combined_scores = FindingValidator.combine_strategy_scores(strategy_results)
+                
+                # Add the combined score to the result
+                result.combined_assessment = combined_scores
+                
+                # Override the overall detection flag based on the combined confidence
+                if combined_scores["combined_confidence"] > 0.6:
+                    result.has_hidden_data = True
+                elif combined_scores["combined_confidence"] < 0.4 and result.has_hidden_data:
+                    # If individual strategies triggered but combined confidence is low,
+                    # mark as "potential false positive"
+                    result.potential_false_positive = True
+                    
+                self.logger.info(f"Combined confidence for {image_path.name}: {combined_scores['combined_confidence']:.2f} - {combined_scores['conclusion']}")
+            except Exception as e:
+                self.logger.error(f"Error applying multi-factor scoring to {image_path.name}: {e}")
         
         return result
     
@@ -427,6 +505,11 @@ class StegAnalysisPipeline(BasePipeline):
         # Record start time for tracking progress
         start_time = time.time()
         
+        # Create necessary directories
+        (self.output_path / "results").mkdir(parents=True, exist_ok=True)
+        (self.output_path / "extracted_data").mkdir(parents=True, exist_ok=True)
+        (self.output_path / "logs").mkdir(parents=True, exist_ok=True)
+        
         image_files = self.find_images()
         self.logger.info(f"Found {len(image_files)} images to analyze")
         
@@ -444,20 +527,39 @@ class StegAnalysisPipeline(BasePipeline):
             result_path.parent.mkdir(parents=True, exist_ok=True)
             
             try:
+                # First attempt to serialize the result
+                result_dict = result.to_dict()
+                # Verify the result can be serialized before writing
+                json.dumps(result_dict)  # This will raise TypeError if not serializable
+                
                 with open(result_path, "w") as f:
-                    json.dump(result.to_dict(), f, indent=2)
-            except TypeError as e:
-                self.logger.error(f"Error serializing result for {image_path.name}: {e}")
-                # Try a fallback method with more aggressive serialization
-                with open(result_path, "w") as f:
-                    simplified_result = {
-                        "image_path": str(image_path),
-                        "image_name": image_path.name,
-                        "has_hidden_data": result.has_hidden_data,
-                        "error": "Some data could not be serialized to JSON"
-                    }
-                    json.dump(simplified_result, f, indent=2)
+                    json.dump(result_dict, f, indent=2)
                     
+            except (TypeError, ValueError, json.JSONDecodeError) as e:
+                self.logger.error(f"Error serializing result for {image_path.name}: {e}")
+                # Create a simplified fallback result
+                fallback_result = {
+                    "image_path": str(image_path),
+                    "image_name": image_path.name,
+                    "has_hidden_data": bool(result.has_hidden_data),
+                    "error": f"Data serialization error: {str(e)}",
+                    "strategy_results": {}
+                }
+                
+                # Try to salvage any strategy results that can be serialized
+                for strategy_name, strategy_result in result.strategy_results.items():
+                    try:
+                        # Test if this individual strategy result can be serialized
+                        test_json = json.dumps(make_json_serializable(strategy_result))
+                        fallback_result["strategy_results"][strategy_name] = json.loads(test_json)
+                    except Exception:
+                        fallback_result["strategy_results"][strategy_name] = {
+                            "error": "Could not serialize strategy result"
+                        }
+                
+                with open(result_path, "w") as f:
+                    json.dump(fallback_result, f, indent=2)
+                
             # Calculate and display progress
             progress = (i + 1) / len(image_files) * 100
             elapsed_time = time.time() - start_time
@@ -471,10 +573,20 @@ class StegAnalysisPipeline(BasePipeline):
                 eta_sec = int(eta_seconds % 60)
                 self.logger.debug(f"Progress: {progress:.1f}% - ETA: {eta_min}m {eta_sec}s")
         
+        # Get high-confidence images
+        high_confidence_images = [r for r in self.results if 
+                                r.combined_assessment and 
+                                r.combined_assessment.get("combined_confidence", 0) > 0.7]
+        
+        # Get potential false positive images
+        potential_false_positives = [r for r in self.results if r.potential_false_positive]
+        
         # Compile summary
         summary = {
             "total_images": len(self.results),
             "images_with_hidden_data": sum(1 for r in self.results if r.has_hidden_data),
+            "high_confidence_detections": len(high_confidence_images),
+            "potential_false_positives": len(potential_false_positives),
             "strategy_success_counts": {
                 strategy_class.name: sum(
                     1 for r in self.results 
@@ -492,14 +604,40 @@ class StegAnalysisPipeline(BasePipeline):
         with open(summary_path, "w") as f:
             json.dump(summary, f, indent=2)
             
+        # Save high confidence detections to a separate file
+        if high_confidence_images:
+            high_conf_path = self.output_path / "high_confidence_detections.json"
+            with open(high_conf_path, "w") as f:
+                json.dump({
+                    "count": len(high_confidence_images),
+                    "images": [
+                        {
+                            "image_name": r.image_name,
+                            "image_path": str(r.image_path),
+                            "confidence": r.combined_assessment.get("combined_confidence", 0),
+                            "conclusion": r.combined_assessment.get("conclusion", ""),
+                            "evidence_count": r.combined_assessment.get("evidence_count", 0)
+                        }
+                        for r in high_confidence_images
+                    ]
+                }, f, indent=2)
+            
         # Update the summary in the base directory
         base_dir = self.output_path.parent
         with open(base_dir / f"latest_run_summary_{self.timestamp}.txt", "a") as f:
             f.write(f"\nAnalysis completed in {summary['elapsed_time']:.2f} seconds\n")
             f.write(f"Total images: {summary['total_images']}\n")
             f.write(f"Images with hidden data: {summary['images_with_hidden_data']}\n")
+            f.write(f"High confidence detections: {summary['high_confidence_detections']}\n")
+            f.write(f"Potential false positives: {summary['potential_false_positives']}\n")
             strategy_counts = "\n".join([f"  - {name}: {count}" for name, count in summary['strategy_success_counts'].items()])
             f.write(f"Strategy success counts:\n{strategy_counts}\n")
+            
+            # Add information about high confidence detections
+            if high_confidence_images:
+                f.write("\nHigh confidence detections:\n")
+                for r in high_confidence_images:
+                    f.write(f"  - {r.image_name}: {r.combined_assessment.get('combined_confidence', 0):.2f} - {r.combined_assessment.get('conclusion', '')}\n")
         
         self.logger.info(f"Analysis completed. Summary: {summary}")
         self.logger.info(f"Results saved to: {self.output_path}")

@@ -1,4 +1,0 @@
-Latest analysis run: 20250404_110630
-
-Input directory: /Users/adam/Git/yzy-investigation/data/raw/yews/2025-03-27-SMALL
-Full results in: results/image_cracking/stego_analysis/run_20250404_110630
