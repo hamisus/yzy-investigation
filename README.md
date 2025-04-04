@@ -36,9 +36,59 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
 
+4. Install system dependencies:
+```bash
+# On macOS
+brew install ffmpeg aria2 octave imagemagick steghide
+
+# On Debian/Ubuntu
+sudo apt-get install ffmpeg aria2 octave octave-image octave-signal octave-nan liboctave-dev imagemagick steghide outguess
+```
+
 ## Usage
 
 The project includes a command-line interface for running various tools. Here are some examples:
+
+### X Spaces Downloader & Transcriber
+
+The X Spaces project allows you to download and transcribe X/Twitter Spaces audio.
+
+```bash
+# Download a Space
+python -m yzy_investigation.projects.x_spaces.cli download "https://twitter.com/i/spaces/..."
+
+# Download to a specific directory
+python -m yzy_investigation.projects.x_spaces.cli download "https://twitter.com/i/spaces/..." --output-dir ./my_spaces
+
+# Transcribe a downloaded Space
+python -m yzy_investigation.projects.x_spaces.cli transcribe "path/to/space.m4a"
+
+# Transcribe with a specific Whisper model and language
+python -m yzy_investigation.projects.x_spaces.cli transcribe "path/to/space.m4a" \
+    --model medium --language en
+
+# Download and transcribe in one go
+python -m yzy_investigation.projects.x_spaces.cli download-transcribe "https://twitter.com/i/spaces/..."
+```
+
+You can also use the X Spaces tools programmatically:
+
+```python
+from yzy_investigation.projects.x_spaces import SpaceDownloader, SpaceTranscriber
+
+# Download a Space
+downloader = SpaceDownloader(output_dir="./my_spaces")
+audio_path = downloader.download_space("https://twitter.com/i/spaces/...")
+
+# Transcribe the Space
+transcriber = SpaceTranscriber(model_name="base")
+result = transcriber.transcribe(audio_path, language="en")
+
+# Access transcription results
+print(result["text"])  # Full transcription
+for segment in result["segments"]:
+    print(f"{segment['start']:.1f}s - {segment['end']:.1f}s: {segment['text']}")
+```
 
 ### Web Scraper (YEWS.news)
 
@@ -116,7 +166,6 @@ from yzy_investigation.projects.web_scraper import YewsScraper
 scraper = YewsScraper()
 results = scraper.run()
 ```
-
 
 ## Development
 

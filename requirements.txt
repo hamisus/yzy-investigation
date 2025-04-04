@@ -26,6 +26,11 @@ transformers>=4.36.0
 # Web scraping
 playwright>=1.41.0
 
+# X Spaces
+yt-dlp>=2024.3.10
+openai-whisper>=20231117
+ffmpeg-python>=0.2.0
+
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
