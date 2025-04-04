@@ -9,6 +9,7 @@ import os
 import json
 import base64
 import time
+import re
 
 from PIL import Image
 import numpy as np
@@ -21,6 +22,7 @@ except ImportError:
 
 from yzy_investigation.core.base_pipeline import BasePipeline
 from yzy_investigation.core.data_manager import DataManager
+from yzy_investigation.projects.image_cracking.finding_validator import FindingValidator
 
 
 # Create a named logger
@@ -192,24 +194,12 @@ class StegAnalysisResult:
             
         # Ensure data is JSON serializable
         if data:
-            data = self._make_json_serializable(data)
+            data = make_json_serializable(data)
             
         self.strategy_results[strategy_name] = {
             "detected": bool(detected),  # Explicitly convert to Python bool
             "data": data or {}
         }
-    
-    def _make_json_serializable(self, data: Any) -> Any:
-        """
-        Convert data to be JSON serializable.
-        
-        Args:
-            data: Data to convert
-            
-        Returns:
-            JSON serializable version of the data
-        """
-        return make_json_serializable(data)
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -223,19 +213,19 @@ class StegAnalysisResult:
             "image_path": str(self.image_path),
             "image_name": self.image_name,
             "has_hidden_data": bool(self.has_hidden_data),
-            "strategy_results": self._make_json_serializable(self.strategy_results)
+            "strategy_results": make_json_serializable(self.strategy_results)
         }
         
         # Add combined assessment if available
         if self.combined_assessment is not None:
-            result_dict["combined_assessment"] = self._make_json_serializable(self.combined_assessment)
+            result_dict["combined_assessment"] = make_json_serializable(self.combined_assessment)
             
         # Add potential false positive flag if true
         if self.potential_false_positive:
             result_dict["potential_false_positive"] = bool(self.potential_false_positive)
             
         # Final pass to ensure everything is serializable
-        return self._make_json_serializable(result_dict)
+        return make_json_serializable(result_dict)
 
 
 class StegAnalysisPipeline(BasePipeline):
@@ -393,7 +383,6 @@ class StegAnalysisPipeline(BasePipeline):
         # Apply multi-factor scoring if we have more than one strategy result
         if len(strategy_results) > 1:
             try:
-                from yzy_investigation.projects.image_cracking.stego_strategies import FindingValidator
                 combined_scores = FindingValidator.combine_strategy_scores(strategy_results)
                 
                 # Add the combined score to the result

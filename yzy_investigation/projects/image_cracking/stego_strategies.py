@@ -18,6 +18,7 @@ import os
 import json
 
 from yzy_investigation.projects.image_cracking.stego_analysis import StegStrategy
+from yzy_investigation.projects.image_cracking.finding_validator import FindingValidator
 
 
 class LsbStrategy(StegStrategy):
@@ -1533,22 +1534,28 @@ class KeywordXorStrategy(StegStrategy):
     name: str = "keyword_xor_strategy"
     description: str = "XOR operation with key investigation terms"
     
-    # Key terms to try as XOR keys
-    KEY_TERMS = [
-        "4NBT",
-        "silver",
-        "YZY",
-        "4NBTf8PfLH4oLFnwf3knv46FY9i5oXjDxffCetXRpump",
-    ]
-    
-    # Key numbers to try as shifts or in other operations
-    KEY_NUMBERS = [4, 333, 353]
-    
     def __init__(self) -> None:
         """Initialize the strategy."""
         super().__init__()
-        # Don't hardcode the output directory, use the one provided by the parent class
-        # The output_dir will be set properly by StegAnalysisPipeline when the strategy is used
+        
+        # Load config
+        config_path = Path(__file__).parent / "config" / "keywords.json"
+        try:
+            with open(config_path) as f:
+                config = json.load(f)
+            self.KEY_TERMS = config.get("keywords", [])
+            self.KEY_NUMBERS = config.get("key_numbers", [4, 333, 353])
+            self.SIGNIFICANCE_MARKERS = config.get("significance_markers", {})
+        except Exception as e:
+            self.logger.error(f"Error loading keywords config: {e}")
+            # Fallback to defaults
+            self.KEY_TERMS = ["4NBT", "silver", "YZY"]
+            self.KEY_NUMBERS = [4, 333, 353]
+            self.SIGNIFICANCE_MARKERS = {
+                "4nbt": 0.8,
+                "yzy": 0.7,
+                "silver": 0.7
+            }
     
     def analyze(self, image_path: Path) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """

@@ -53,6 +53,13 @@ python -m yzy_investigation.main scrape-yews -v
 python -m yzy_investigation.main scrape-yews --output-dir ./custom_output
 ```
 
+### Image Cracking
+
+```bash
+# Basic usage
+python -m yzy_investigation.main image-crack --input-dir "data/raw/yews/2025-03-27"
+```
+
 ### View Available Commands
 
 ```bash
@@ -79,13 +86,6 @@ scraper = YewsScraper()
 results = scraper.run()
 ```
 
-### Lyrics Analysis
-```python
-from yzy_investigation.projects.lyrics_analysis import LyricsAnalyzer
-
-analyzer = LyricsAnalyzer()
-results = analyzer.analyze()
-```
 
 ## Development
 
