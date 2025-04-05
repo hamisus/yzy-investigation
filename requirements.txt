@@ -10,8 +10,7 @@ tqdm>=4.66.0
 stegano>=0.9.12
 cryptography>=41.0.0
 pytesseract>=0.3.10
-pyblake2>=1.1.2
-stegpy>=0.1.4
+stegpy==0.0.1  # Only version available
 exifread>=3.0.0
 scikit-image>=0.20.0
 scipy>=1.10.0
@@ -30,6 +29,7 @@ playwright>=1.41.0
 yt-dlp>=2024.3.10
 openai-whisper>=20231117
 ffmpeg-python>=0.2.0
+requests>=2.31.0  # Required by yt-dlp
 
 # Testing
 pytest>=7.4.0

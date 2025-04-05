@@ -25,25 +25,27 @@ git clone https://github.com/hamisus/yzy-investigation.git
 cd yzy-investigation
 ```
 
-2. Create and activate a virtual environment (recommended):
+2. Install system dependencies:
+```bash
+# On macOS
+brew install ffmpeg aria2 octave imagemagick steghide pytorch
+
+# On Debian/Ubuntu
+sudo apt-get install ffmpeg aria2 octave octave-image octave-signal octave-nan liboctave-dev imagemagick steghide outguess python3-torch
+```
+
+3. Create and activate a virtual environment (recommended):
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install in development mode:
+4. Install Python dependencies:
 ```bash
 pip install -e .
 ```
 
-4. Install system dependencies:
-```bash
-# On macOS
-brew install ffmpeg aria2 octave imagemagick steghide
-
-# On Debian/Ubuntu
-sudo apt-get install ffmpeg aria2 octave octave-image octave-signal octave-nan liboctave-dev imagemagick steghide outguess
-```
+Note: For Apple Silicon (M1/M2/M3) Macs, ensure you have macOS 12.3 or later for proper GPU support with PyTorch/MPS.
 
 ## Usage
 
@@ -118,7 +120,7 @@ python -m yzy_investigation.main image-crack --input-dir data/raw/yews/2025-03-2
 
 ### Steganography Analysis
 
-The stego analysis project provides lower-level tools for analyzing images using Aletheia and other steganography detection techniques.
+The stego analysis project provides lower-level tools for analyzing images using [Aletheia](https://github.com/daniellerch/aletheia) and other steganography detection techniques.
 
 ```bash
 # Analyze a single image
@@ -135,36 +137,6 @@ python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/
 
 # Specify file extensions for batch analysis
 python -m yzy_investigation.projects.stego_analysis.stego_analyzer batch path/to/directory -e jpg png
-```
-
-Note: The stego analysis project requires additional system dependencies:
-- On macOS: `brew install octave imagemagick steghide`
-- On Debian/Ubuntu: `sudo apt-get install octave octave-image octave-signal octave-nan liboctave-dev imagemagick steghide outguess`
-
-### View Available Commands
-
-```bash
-python -m yzy_investigation.main --help
-```
-
-## Code Examples
-
-Each sub-project can also be used programmatically:
-
-### Puzzle Cracking
-```python
-from yzy_investigation.projects.puzzle_cracking import PuzzleCracker
-
-cracker = PuzzleCracker(input_path="data/raw/puzzles")
-results = cracker.run()
-```
-
-### Web Scraping
-```python
-from yzy_investigation.projects.web_scraper import YewsScraper
-
-scraper = YewsScraper()
-results = scraper.run()
 ```
 
 ## Development
@@ -184,4 +156,4 @@ results = scraper.run()
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.

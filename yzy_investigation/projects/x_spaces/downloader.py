@@ -10,6 +10,7 @@ import subprocess
 import re
 import tempfile
 import shutil
+import logging
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 from datetime import datetime
@@ -17,6 +18,13 @@ import yt_dlp
 import requests
 from tqdm import tqdm
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 class ProgressLogger:
     """Handles progress logging for different stages of the download process."""
@@ -64,10 +72,22 @@ class SpaceDownloader:
         
         Args:
             output_dir: Optional directory path where downloaded spaces will be saved.
-                       If None, creates a 'downloaded_spaces' directory in the current path.
+                       If None, saves to data/raw/spaces directory.
         """
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd() / 'downloaded_spaces'
+        if output_dir:
+            self.output_dir = Path(output_dir)
+        else:
+            # Find the project root by looking for the data/raw directory
+            current_dir = Path(__file__).resolve().parent
+            while current_dir.name != "yzy-investigation" and current_dir.parent != current_dir:
+                current_dir = current_dir.parent
+            if current_dir.name != "yzy-investigation":
+                raise Exception("Could not find project root directory")
+            
+            self.output_dir = current_dir / 'data' / 'raw' / 'spaces'
+            
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Output directory set to: {self.output_dir}")
         self.progress = ProgressLogger()
         
     def _get_stream_info(self, space_url: str) -> Tuple[str, str, Dict[str, Any]]:
@@ -83,6 +103,7 @@ class SpaceDownloader:
         Raises:
             Exception: If yt-dlp fails to extract the stream information.
         """
+        logger.info(f"Extracting information from Space URL: {space_url}")
         self.progress.start_stage("Extracting Space information")
         
         ydl_opts = {
@@ -97,14 +118,16 @@ class SpaceDownloader:
                 stream_url = info['url']
                 # Format: YYYYMMDD - username.title.id.m4a
                 filename = f"{datetime.now().strftime('%Y%m%d')} - {info['uploader']}.{info['title']}.{info['id']}.m4a"
+                filename = "".join(c for c in filename if c.isalnum() or c in ".- ")  # Sanitize filename
                 
                 self.progress.finish_stage()
                 duration_str = info.get('duration_string', 'Unknown duration')
-                print(f"Found Space: {info['title']} by {info['uploader']} ({duration_str})")
+                logger.info(f"Found Space: {info['title']} by {info['uploader']} ({duration_str})")
                 return stream_url, filename, info
                 
         except Exception as e:
             self.progress.finish_stage()
+            logger.error(f"Failed to extract stream information: {str(e)}")
             raise Exception(f"Failed to extract stream information: {str(e)}")
 
     def _download_m3u8(self, url: str, temp_dir: Path) -> Tuple[str, str, int]:
@@ -118,9 +141,11 @@ class SpaceDownloader:
         Returns:
             Tuple of (playlist path, modified playlist path, chunk count)
         """
+        logger.info("Downloading m3u8 playlist")
         # Download the m3u8 file
         response = requests.get(url)
         if not response.ok:
+            logger.error("Failed to download m3u8 playlist")
             raise Exception("Failed to download m3u8 playlist")
             
         # Get the base URL for the stream
@@ -145,6 +170,7 @@ class SpaceDownloader:
                 chunk_count += 1
                 
         modified_path.write_text('\n'.join(modified_content))
+        logger.info(f"Found {chunk_count} audio chunks to download")
         
         return str(playlist_path), str(modified_path), chunk_count
 
@@ -165,10 +191,15 @@ class SpaceDownloader:
         try:
             # Create temporary directory for all processing
             temp_dir = Path(tempfile.mkdtemp())
+            logger.info(f"Created temporary directory: {temp_dir}")
             
             # Get stream information
             stream_url, filename, info = self._get_stream_info(space_url)
             output_path = self.output_dir / filename
+            
+            if output_path.exists():
+                logger.warning(f"File already exists: {output_path}")
+                return output_path
             
             # Download and process m3u8 playlist
             self.progress.start_stage("Downloading playlist")
@@ -177,6 +208,7 @@ class SpaceDownloader:
             
             # Download audio chunks
             self.progress.start_stage("Downloading audio chunks", total=chunk_count)
+            logger.info("Starting audio chunk download")
             
             # Use aria2c for efficient chunk downloading
             aria_cmd = [
@@ -209,10 +241,12 @@ class SpaceDownloader:
             self.progress.finish_stage()
             
             if process.returncode != 0:
+                logger.error("Failed to download audio chunks")
                 raise Exception("Failed to download audio chunks")
             
             # Combine chunks into final file
             self.progress.start_stage("Combining audio chunks")
+            logger.info("Combining audio chunks into final file")
             
             ffmpeg_cmd = [
                 'ffmpeg',
@@ -227,22 +261,25 @@ class SpaceDownloader:
             self.progress.finish_stage()
             
             if process.returncode != 0:
+                logger.error("Failed to combine audio chunks")
                 raise Exception("Failed to combine audio chunks")
             
             # Final status
             file_size = output_path.stat().st_size / (1024 * 1024)  # Size in MB
-            print(f"\nDownload completed successfully:")
-            print(f"- File: {output_path}")
-            print(f"- Size: {file_size:.1f} MB")
-            print(f"- Duration: {info.get('duration_string', 'Unknown')}")
+            logger.info("\nDownload completed successfully:")
+            logger.info(f"- File: {output_path}")
+            logger.info(f"- Size: {file_size:.1f} MB")
+            logger.info(f"- Duration: {info.get('duration_string', 'Unknown')}")
             
             return output_path
             
         except Exception as e:
             self.progress.finish_stage()
+            logger.error(f"Failed to download space: {str(e)}")
             raise Exception(f"Failed to download space: {str(e)}")
             
         finally:
             # Clean up temporary directory and all its contents
             if temp_dir and temp_dir.exists():
+                logger.info("Cleaning up temporary files")
                 shutil.rmtree(temp_dir, ignore_errors=True) 

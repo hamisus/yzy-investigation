@@ -17,6 +17,16 @@ setup(
         "transformers>=4.36.0",
         "playwright>=1.41.0",
         "aiohttp>=3.9.0",
+        # X Spaces dependencies
+        "yt-dlp>=2024.3.10",
+        "openai-whisper>=20231117",
+        "ffmpeg-python>=0.2.0",
+        "tqdm>=4.66.0",
     ],
     python_requires=">=3.8",
+    entry_points={
+        'console_scripts': [
+            'x-spaces=yzy_investigation.projects.x_spaces.cli:main',
+        ],
+    },
 ) 
