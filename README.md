@@ -53,7 +53,7 @@ The project includes a command-line interface for running various tools. Here ar
 
 ### X Spaces Downloader & Transcriber
 
-The X Spaces project allows you to download and transcribe X/Twitter Spaces audio.
+The X Spaces project allows you to download X/Twitter Spaces audio. Transcription to be added later.
 
 ```bash
 # Download a Space
