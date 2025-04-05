@@ -7,5 +7,6 @@ and transcribe their audio content.
 
 from .downloader import SpaceDownloader
 from .transcriber import SpaceTranscriber
+from .summarizer import SpaceSummarizer
 
-__all__ = ['SpaceDownloader', 'SpaceTranscriber'] 
+__all__ = ['SpaceDownloader', 'SpaceTranscriber', 'SpaceSummarizer'] 

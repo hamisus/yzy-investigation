@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, NoReturn
 from .downloader import SpaceDownloader
 from .transcriber import SpaceTranscriber
+from .summarizer import SpaceSummarizer
 
 
 def handle_error(e: Exception) -> NoReturn:
@@ -49,6 +50,21 @@ def transcribe_space(args: argparse.Namespace) -> None:
         handle_error(e)
 
 
+def summarize_transcript(args: argparse.Namespace) -> None:
+    """Summarize a transcript file."""
+    try:
+        summarizer = SpaceSummarizer(
+            api_key=args.api_key,
+            model=args.model,
+            chunk_size=args.chunk_size,
+            max_workers=args.max_workers,
+            output_dir=args.output_dir
+        )
+        summarizer.summarize_from_file(args.transcript_file)
+    except Exception as e:
+        handle_error(e)
+
+
 def download_and_transcribe(args: argparse.Namespace) -> None:
     """Download a Space and then transcribe it."""
     try:
@@ -62,6 +78,36 @@ def download_and_transcribe(args: argparse.Namespace) -> None:
         
         # Then transcribe it
         transcribe_space(args)
+    except Exception as e:
+        handle_error(e)
+
+
+def download_transcribe_and_summarize(args: argparse.Namespace) -> None:
+    """Download a Space, transcribe it, and then summarize the transcript."""
+    try:
+        # First download the space
+        audio_path = download_space(args)
+        if audio_path is None:
+            return
+            
+        # Update args for transcription
+        args.audio_file = audio_path
+        
+        # Then transcribe it
+        transcriber = SpaceTranscriber(
+            model_name=args.whisper_model,
+            output_dir=args.output_dir
+        )
+        transcript_result = transcriber.transcribe(args.audio_file, language=args.language)
+        
+        # Get the path to the transcript file
+        transcript_path = Path(audio_path).parent / f"{Path(audio_path).stem}.transcription.json"
+        
+        # Update args for summarization
+        args.transcript_file = transcript_path
+        
+        # Finally, summarize the transcript
+        summarize_transcript(args)
     except Exception as e:
         handle_error(e)
 
@@ -122,6 +168,47 @@ def main() -> None:
         default=None
     )
     
+    # Common OpenAI API arguments
+    openai_args = argparse.ArgumentParser(add_help=False)
+    openai_args.add_argument(
+        "--api-key",
+        help="OpenAI API key (if not provided, will use OPENAI_API_KEY environment variable)",
+        default=None
+    )
+    openai_args.add_argument(
+        "--model",
+        help="OpenAI model to use for summarization",
+        default="gpt-4"
+    )
+    
+    # Summarize command
+    summarize_parser = subparsers.add_parser(
+        "summarize",
+        help="Summarize a transcript file",
+        parents=[openai_args]
+    )
+    summarize_parser.add_argument(
+        "transcript_file",
+        help="Path to the transcript file to summarize"
+    )
+    summarize_parser.add_argument(
+        "--chunk-size",
+        help="Number of characters per chunk for transcript processing",
+        type=int,
+        default=3000
+    )
+    summarize_parser.add_argument(
+        "--max-workers",
+        help="Maximum number of workers for parallel processing",
+        type=int,
+        default=1
+    )
+    summarize_parser.add_argument(
+        "--output-dir",
+        help="Directory to save the summary",
+        default=None
+    )
+    
     # Download and transcribe command
     download_transcribe_parser = subparsers.add_parser(
         "download-transcribe",
@@ -148,6 +235,46 @@ def main() -> None:
         default=None
     )
     
+    # Download, transcribe, and summarize command
+    download_transcribe_summarize_parser = subparsers.add_parser(
+        "download-transcribe-summarize",
+        help="Download, transcribe, and summarize a Space",
+        parents=[openai_args]
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "url",
+        help="URL of the X/Twitter Space"
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "--whisper-model",
+        help="Whisper model to use for transcription",
+        choices=["tiny", "base", "small", "medium", "large"],
+        default="base",
+        dest="whisper_model"
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "--language",
+        help="Language code (e.g., 'en' for English)",
+        default=None
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "--chunk-size",
+        help="Number of characters per chunk for transcript processing",
+        type=int,
+        default=3000
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "--max-workers",
+        help="Maximum number of workers for parallel processing",
+        type=int,
+        default=1
+    )
+    download_transcribe_summarize_parser.add_argument(
+        "--output-dir",
+        help="Directory to save audio, transcription, and summary",
+        default=None
+    )
+    
     args = parser.parse_args()
     print(f"Parsed args: {args}")  # Debug print
     
@@ -158,9 +285,15 @@ def main() -> None:
         elif args.command == "transcribe":
             print("Executing transcribe command...")  # Debug print
             transcribe_space(args)
+        elif args.command == "summarize":
+            print("Executing summarize command...")  # Debug print
+            summarize_transcript(args)
         elif args.command == "download-transcribe":
             print("Executing download-transcribe command...")  # Debug print
             download_and_transcribe(args)
+        elif args.command == "download-transcribe-summarize":
+            print("Executing download-transcribe-summarize command...")  # Debug print
+            download_transcribe_and_summarize(args)
         else:
             print("No command specified, showing help...")  # Debug print
             parser.print_help()
