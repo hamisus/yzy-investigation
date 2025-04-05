@@ -1,6 +1,6 @@
 # YzY Investigation
 
-A Python-based toolkit for investigating the 4NBT (yzY) meme coin phenomenon, including puzzle solving, web scraping, and lyrics analysis capabilities.
+A Python-based toolkit for investigating the 4NBT (yzY) meme coin phenomenon, including puzzle solving, web scraping, and X spaces downloading capabilities.
 
 ## Project Structure
 

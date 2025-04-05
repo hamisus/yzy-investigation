@@ -21,11 +21,6 @@ WEB_SCRAPER = {
     "max_retries": 3,
 }
 
-LYRICS_ANALYSIS = {
-    "min_confidence": 0.8,
-    "max_lyrics_per_song": 1000,
-}
-
 # Logging settings
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_LEVEL = "INFO" 
