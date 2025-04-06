@@ -91,7 +91,7 @@ transcript_data = transcriber.transcribe(audio_path)
 # Summarize the transcript
 summarizer = SpaceSummarizer(
     api_key="your-api-key",  # Optional if OPENAI_API_KEY is set
-    model="gpt-4",
+    model="gpt-4o",
     chunk_size=3000,
     max_workers=1,
     output_dir="summaries"

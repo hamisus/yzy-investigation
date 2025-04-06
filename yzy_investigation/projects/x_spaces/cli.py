@@ -178,7 +178,7 @@ def main() -> None:
     openai_args.add_argument(
         "--model",
         help="OpenAI model to use for summarization",
-        default="gpt-4"
+        default="gpt-4o"
     )
     
     # Summarize command
@@ -195,7 +195,7 @@ def main() -> None:
         "--chunk-size",
         help="Number of characters per chunk for transcript processing",
         type=int,
-        default=3000
+        default=8000
     )
     summarize_parser.add_argument(
         "--max-workers",
@@ -261,7 +261,7 @@ def main() -> None:
         "--chunk-size",
         help="Number of characters per chunk for transcript processing",
         type=int,
-        default=3000
+        default=8000
     )
     download_transcribe_summarize_parser.add_argument(
         "--max-workers",

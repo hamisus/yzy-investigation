@@ -157,3 +157,4 @@ yzy_investigation/projects/puzzle_cracking/scripts/__pycache__/
 *.svg
 *.heic
 *.heif
+.vscode/launch.json

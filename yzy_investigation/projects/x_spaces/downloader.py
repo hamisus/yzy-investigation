@@ -11,6 +11,7 @@ import re
 import tempfile
 import shutil
 import logging
+import json
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 from datetime import datetime
@@ -90,6 +91,80 @@ class SpaceDownloader:
         logger.info(f"Output directory set to: {self.output_dir}")
         self.progress = ProgressLogger()
         
+    def _format_timestamp(self, timestamp: Optional[int]) -> Tuple[str, str]:
+        """
+        Format a Unix timestamp into both sortable and readable formats.
+        
+        Args:
+            timestamp: Unix timestamp
+            
+        Returns:
+            Tuple of (sortable_format, readable_format)
+            sortable_format: YYYYMMDD_HHMM
+            readable_format: YYYY-MM-DD HH:MM
+        """
+        if not timestamp:
+            now = datetime.now()
+            return (
+                now.strftime("%Y%m%d_%H%M"),
+                now.strftime("%Y-%m-%d %H:%M")
+            )
+            
+        dt = datetime.fromtimestamp(timestamp)
+        return (
+            dt.strftime("%Y%m%d_%H%M"),
+            dt.strftime("%Y-%m-%d %H:%M")
+        )
+
+    def _save_metadata(self, info: Dict[str, Any], base_path: Path) -> None:
+        """
+        Save space metadata to a JSON file.
+        
+        Args:
+            info: Dictionary containing space metadata
+            base_path: Path to the audio file (without extension)
+        """
+        metadata = {
+            'title': info.get('title'),
+            'description': info.get('description'),
+            'uploader': info.get('uploader'),
+            'uploader_id': info.get('uploader_id'),
+            'live_status': info.get('live_status'),
+            'recorded_at': self._format_timestamp(info.get('timestamp'))[1],
+            'released_at': self._format_timestamp(info.get('release_timestamp'))[1],
+            'duration': info.get('duration_string'),
+            'id': info.get('id'),
+            'url': info.get('webpage_url'),
+            'participants': self._extract_participants(info.get('description', '')),
+        }
+        
+        metadata_path = base_path.with_suffix('.json')
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        logger.info(f"Saved metadata to: {metadata_path}")
+
+    def _extract_participants(self, description: str) -> list[str]:
+        """
+        Extract participant names from the space description.
+        
+        Args:
+            description: Space description text
+            
+        Returns:
+            List of participant names
+        """
+        if not description or 'participated by' not in description.lower():
+            return []
+            
+        # Extract everything after "participated by"
+        parts = description.lower().split('participated by')
+        if len(parts) < 2:
+            return []
+            
+        # Split participants and clean up names
+        participants = parts[1].split(',')
+        return [p.strip() for p in participants]
+
     def _get_stream_info(self, space_url: str) -> Tuple[str, str, Dict[str, Any]]:
         """
         Get the stream URL and filename for the Space.
@@ -115,14 +190,41 @@ class SpaceDownloader:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(space_url, download=False)
+                
+                # Print all available info fields
+                logger.info("Available Space information:")
+                for key, value in info.items():
+                    logger.info(f"- {key}: {value}")
+                
                 stream_url = info['url']
-                # Format: YYYYMMDD - username.title.id.m4a
-                filename = f"{datetime.now().strftime('%Y%m%d')} - {info['uploader']}.{info['title']}.{info['id']}.m4a"
-                filename = "".join(c for c in filename if c.isalnum() or c in ".- ")  # Sanitize filename
+                
+                # Get sortable and readable timestamps
+                sortable_date, readable_date = self._format_timestamp(info.get('timestamp'))
+                
+                # Create base filename without extension
+                base_filename = f"{sortable_date} - {info['title']}"
+                # Sanitize filename
+                base_filename = "".join(c for c in base_filename if c.isalnum() or c in ".- ")
+                
+                # Full filename with extension
+                filename = f"{base_filename}.m4a"
                 
                 self.progress.finish_stage()
-                duration_str = info.get('duration_string', 'Unknown duration')
-                logger.info(f"Found Space: {info['title']} by {info['uploader']} ({duration_str})")
+                
+                # Print more detailed information about the space
+                logger.info("\nSpace Details:")
+                logger.info(f"- Title: {info['title']}")
+                logger.info(f"- Creator: {info['uploader']} (@{info.get('uploader_id', 'unknown')})")
+                logger.info(f"- Duration: {info.get('duration_string', 'Unknown')}")
+                logger.info(f"- Recorded at: {readable_date}")
+                if info.get('release_timestamp'):
+                    release_date = self._format_timestamp(info['release_timestamp'])[1]
+                    logger.info(f"- Released at: {release_date}")
+                logger.info(f"- ID: {info['id']}")
+                
+                # Save base filename for metadata
+                info['base_filename'] = base_filename
+                
                 return stream_url, filename, info
                 
         except Exception as e:
@@ -264,10 +366,15 @@ class SpaceDownloader:
                 logger.error("Failed to combine audio chunks")
                 raise Exception("Failed to combine audio chunks")
             
+            # Save metadata
+            base_path = output_path.with_suffix('')  # Remove extension
+            self._save_metadata(info, base_path)
+            
             # Final status
             file_size = output_path.stat().st_size / (1024 * 1024)  # Size in MB
             logger.info("\nDownload completed successfully:")
-            logger.info(f"- File: {output_path}")
+            logger.info(f"- Audio file: {output_path}")
+            logger.info(f"- Metadata: {base_path.with_suffix('.json')}")
             logger.info(f"- Size: {file_size:.1f} MB")
             logger.info(f"- Duration: {info.get('duration_string', 'Unknown')}")
             

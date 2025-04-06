@@ -24,7 +24,7 @@ class SpaceSummarizer:
     def __init__(self, 
                  api_key: Optional[str] = None, 
                  model: str = "gpt-4o-mini",
-                 chunk_size: int = 3000,
+                 chunk_size: int = 15000,
                  max_workers: int = 1,
                  output_dir: Optional[str] = None):
         """
@@ -73,51 +73,62 @@ class SpaceSummarizer:
         Returns:
             Path where the summary should be saved
         """
-        # Use the same name as the transcript file but with .summary.txt extension
-        output_name = transcript_path.stem.replace(".transcription", "") + ".summary.txt"
+        # Use the same name as the transcript file but with .summary.md extension
+        output_name = transcript_path.stem.replace(".transcription", "") + ".summary.md"
         
         if self.output_dir:
             # Use specified output directory
             output_dir = Path(self.output_dir)
         else:
-            # Default to 'summaries' subdirectory next to input file
-            output_dir = transcript_path.parent / "summaries"
+            # Default to 'summaries' directory parallel to transcripts
+            # Assuming transcript_path is in data/processed/spaces/transcripts/
+            output_dir = transcript_path.parent.parent / "summaries"
             
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir / output_name
     
     def _calculate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
-        """Calculate cost in USD for API usage."""
-        # Prices per 1M tokens
+        """
+        Calculate cost in USD for API usage based on token counts.
+        
+        Args:
+            model: The model name being used
+            prompt_tokens: Number of tokens in the prompt
+            completion_tokens: Number of tokens in the completion
+            
+        Returns:
+            Total cost in USD
+        """
+        # Base prices in USD per token
         if model == "gpt-4.5":
-            prompt_cost = 75.00
-            completion_cost = 150.00
+            prompt_cost = 75.00 / 1_000_000
+            completion_cost = 150.00 / 1_000_000
         elif model == "gpt-4o":
-            prompt_cost = 2.50
-            completion_cost = 10.00
+            prompt_cost = 2.50 / 1_000_000
+            completion_cost = 10.00 / 1_000_000
         elif model == "gpt-4o-mini":
-            prompt_cost = 0.150
-            completion_cost = 0.600
+            prompt_cost = 0.150 / 1_000_000
+            completion_cost = 0.600 / 1_000_000
         # Legacy models
         elif model.startswith("gpt-4"):
             if "32k" in model:
-                prompt_cost = 0.06 * 1000  # Convert to per 1M tokens
-                completion_cost = 0.12 * 1000
+                prompt_cost = 0.06 / 1000  # Price per token
+                completion_cost = 0.12 / 1000
             else:
-                prompt_cost = 0.03 * 1000
-                completion_cost = 0.06 * 1000
+                prompt_cost = 0.03 / 1000
+                completion_cost = 0.06 / 1000
         elif model.startswith("gpt-3.5"):
             if "16k" in model:
-                prompt_cost = 0.003 * 1000
-                completion_cost = 0.004 * 1000
+                prompt_cost = 0.003 / 1000
+                completion_cost = 0.004 / 1000
             else:
-                prompt_cost = 0.0015 * 1000
-                completion_cost = 0.002 * 1000
+                prompt_cost = 0.0015 / 1000
+                completion_cost = 0.002 / 1000
         else:
             return 0.0
             
-        # Calculate cost (converting tokens to millions)
-        total_cost = (prompt_tokens * prompt_cost + completion_tokens * completion_cost) / 1_000_000
+        # Calculate total cost
+        total_cost = (prompt_tokens * prompt_cost) + (completion_tokens * completion_cost)
         return round(total_cost, 4)  # Round to 4 decimal places
 
     def _split_transcript_into_chunks(self, full_text: str) -> List[str]:
@@ -139,23 +150,49 @@ class SpaceSummarizer:
                 chunks.append(full_text[current_position:])
                 break
             
-            # Find a good breaking point (end of a sentence)
+            # Find a good breaking point within the chunk_size limit
             chunk_end = current_position + self.chunk_size
-            # Look for the last period, question mark, or exclamation mark
-            last_sentence_end = max(
-                full_text.rfind('. ', current_position, chunk_end),
-                full_text.rfind('? ', current_position, chunk_end),
-                full_text.rfind('! ', current_position, chunk_end)
-            )
             
-            if last_sentence_end == -1:
-                # If no sentence break found, just break at chunk_size
+            # Look for break points in order of preference:
+            # 1. Long pause (..)
+            # 2. Short pause (.)
+            # 3. End of sentence (. ? !)
+            # 4. Fallback to chunk_size if no natural breaks found
+            
+            # Search for pauses and sentence endings
+            long_pause = full_text.rfind('(..)', current_position, chunk_end)
+            short_pause = full_text.rfind('(.)', current_position, chunk_end)
+            period = full_text.rfind('. ', current_position, chunk_end)
+            question = full_text.rfind('? ', current_position, chunk_end)
+            exclamation = full_text.rfind('! ', current_position, chunk_end)
+            
+            # Find the best break point
+            break_points = [
+                (long_pause + 4 if long_pause != -1 else -1),  # Add 4 to account for (..) length
+                (short_pause + 3 if short_pause != -1 else -1),  # Add 3 to account for (.) length
+                (period + 2 if period != -1 else -1),  # Add 2 to account for '. ' length
+                (question + 2 if question != -1 else -1),
+                (exclamation + 2 if exclamation != -1 else -1)
+            ]
+            
+            # Filter out -1 values and find the latest break point
+            valid_break_points = [p for p in break_points if p > current_position]
+            
+            if valid_break_points:
+                # Take the latest valid break point
+                break_point = max(valid_break_points)
+                chunks.append(full_text[current_position:break_point])
+                current_position = break_point
+            else:
+                # If no natural break points found, break at chunk_size
+                # but try to break at a word boundary
+                temp_end = chunk_end
+                while temp_end > current_position and not full_text[temp_end - 1].isspace():
+                    temp_end -= 1
+                if temp_end > current_position:
+                    chunk_end = temp_end
                 chunks.append(full_text[current_position:chunk_end])
                 current_position = chunk_end
-            else:
-                # Break at the end of a sentence
-                chunks.append(full_text[current_position:last_sentence_end + 2])
-                current_position = last_sentence_end + 2
         
         return chunks
     
@@ -268,18 +305,28 @@ Here's the transcript segment:
         prompt = f"""
 You are creating a{'final' if is_final else 'n intermediate'} summary of a transcript about a crypto coin called "YzY" or "4NBT" by Ye (Kanye West).
 
-{'Below are summaries from different parts of the transcript.' if is_final else 'Below are partial summaries that need to be combined.'} Merge them into ONE cohesive summary that:
-- Captures all key points across all segments
-- Eliminates redundancies (mention recurring topics only once)
-- Presents information in a clear, organized format
-- Maintains only the facts stated in the transcript
+{'Below are summaries from different parts of the transcript.' if is_final else 'Below are partial summaries that need to be combined.'} Create a well-structured Markdown summary that:
 
-IMPORTANT:
-- If different summaries contain conflicting information, include both perspectives
-- Focus on creating a readable, useful TL;DR that someone could quickly scan
-- Maintain a neutral, informative tone
-- Format as bullet points or short paragraphs for readability
-{'- This is a final summary, so make it comprehensive and well-structured' if is_final else '- This is an intermediate summary, so focus on preserving key information while reducing redundancy'}
+1. Starts with a brief overview paragraph that captures the main themes and key points
+2. Organizes the remaining information into logical sections based on the actual content:
+   - Use level 1 headers (# ) only for major themes that have substantial discussion
+   - Use level 2 headers (## ) sparingly for significant subtopics
+   - If there are only 1-2 main topics, prefer a simpler structure without many headers
+   - Let the content dictate the organization - don't force a specific structure
+
+3. Uses appropriate Markdown formatting:
+   - Bullet points for lists of related items
+   - *Emphasis* for important terms or metrics
+   - > Quote blocks for significant direct statements
+   - Paragraphs for flowing narrative
+
+4. Maintains factual accuracy:
+   - Includes only information from the transcript
+   - Preserves important numbers and metrics
+   - Notes any conflicting information
+   - Avoids speculation
+
+IMPORTANT: The structure should emerge from the content. Don't create sections unless they naturally arise from having multiple distinct topics with substantial discussion.
 
 Here are the summaries to consolidate:
 ----------------
@@ -292,7 +339,7 @@ Here are the summaries to consolidate:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that creates concise, factual summaries."},
+                    {"role": "system", "content": "You are a helpful assistant that creates well-structured, factual summaries in Markdown format. You adapt the structure to match the content rather than forcing a predefined format."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
@@ -319,15 +366,30 @@ Here are the summaries to consolidate:
 
     def _get_temp_dir(self, transcript_path: Path) -> Path:
         """Get path to temporary directory for storing intermediate summaries."""
-        temp_dir = transcript_path.parent / "summaries" / "temp" / transcript_path.stem
+        # Store temp files in data/processed/spaces/summaries/temp/
+        temp_dir = transcript_path.parent.parent / "summaries" / "temp" / transcript_path.stem
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
 
-    def _save_chunk_summary(self, chunk_summary: str, chunk_number: int, temp_dir: Path) -> None:
-        """Save an individual chunk summary to temporary storage."""
-        chunk_file = temp_dir / f"chunk_{chunk_number:03d}.txt"
-        with open(chunk_file, 'w', encoding='utf-8') as f:
+    def _save_chunk_summary(self, chunk_summary: str, chunk_text: str, chunk_number: int, temp_dir: Path) -> None:
+        """
+        Save an individual chunk summary and its original text to temporary storage.
+        
+        Args:
+            chunk_summary: The generated summary for this chunk
+            chunk_text: The original text of this chunk
+            chunk_number: The chunk index number
+            temp_dir: Directory to save the files
+        """
+        # Save the summary
+        summary_file = temp_dir / f"chunk_{chunk_number:03d}.summary.txt"
+        with open(summary_file, 'w', encoding='utf-8') as f:
             f.write(chunk_summary)
+            
+        # Save the original chunk text
+        chunk_file = temp_dir / f"chunk_{chunk_number:03d}.text.txt"
+        with open(chunk_file, 'w', encoding='utf-8') as f:
+            f.write(chunk_text)
 
     def summarize_from_text(self, transcript_text: str, output_path: Optional[Union[str, Path]] = None) -> str:
         """
@@ -375,7 +437,7 @@ Here are the summaries to consolidate:
                         summary, _ = future.result()
                         chunk_summaries.append((chunk_idx, summary))
                         # Save intermediate summary
-                        self._save_chunk_summary(summary, chunk_idx + 1, temp_dir)
+                        self._save_chunk_summary(summary, chunks[chunk_idx], chunk_idx + 1, temp_dir)
                     except Exception as e:
                         print(f"Chunk {chunk_idx+1} failed: {str(e)}")
             
@@ -390,7 +452,7 @@ Here are the summaries to consolidate:
                 summary, _ = self._summarize_chunk(chunk, i+1, len(chunks))
                 chunk_summaries.append(summary)
                 # Save intermediate summary
-                self._save_chunk_summary(summary, i + 1, temp_dir)
+                self._save_chunk_summary(summary, chunk, i + 1, temp_dir)
         
         print("\nMerging chunk summaries into final summary...")
         print(f"Total chunks to merge: {len(chunk_summaries)}")
