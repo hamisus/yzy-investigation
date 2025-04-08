@@ -158,3 +158,4 @@ yzy_investigation/projects/puzzle_cracking/scripts/__pycache__/
 *.heic
 *.heif
 .vscode/launch.json
+.cursorrules
