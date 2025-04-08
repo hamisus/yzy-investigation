@@ -2,11 +2,18 @@
 Main CLI interface for the YzY investigation project.
 """
 import argparse
+import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List, Type
+from dotenv import load_dotenv
+import asyncio
+
+# Load environment variables from project root
+PROJECT_ROOT = Path(__file__).parent.parent
+load_dotenv(PROJECT_ROOT / '.env')
 
 from yzy_investigation.projects.web_scraper import YewsScraper
 from yzy_investigation.projects.image_cracking import (
@@ -23,6 +30,9 @@ from yzy_investigation.projects.image_cracking import (
     CustomRgbEncodingStrategy
 )
 from yzy_investigation.projects.image_cracking.scripts.image_crack_cli import ImageCrackingPipeline
+from yzy_investigation.projects.discord_manager.src.discord_manager import DiscordManager
+from yzy_investigation.projects.discord_manager.src.message_summarizer import DiscordMessageSummarizer, SummaryFormat
+from yzy_investigation.projects.discord_manager.src.daily_recap import DailyRecapGenerator
 # Import other project modules as they are implemented
 
 
@@ -199,6 +209,256 @@ def image_crack(
     logging.info("Image cracking completed.")
 
 
+def discord_backup(
+    server_id: Optional[int] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    output_dir: Optional[Path] = None,
+    all_messages: bool = False,
+    verbose: bool = False
+) -> None:
+    """Backup Discord server messages.
+    
+    Args:
+        server_id: Optional ID of the server to backup (defaults to DISCORD_SERVER_ID from .env)
+        start_time: Optional start time for message filtering
+        end_time: Optional end time for message filtering
+        output_dir: Optional output directory for backups
+        all_messages: Whether to backup all messages regardless of date
+        verbose: Whether to enable verbose logging
+    """
+    setup_logging(verbose)
+    logging.info("Starting Discord backup...")
+    
+    # Get server ID from environment if not provided
+    if server_id is None:
+        server_id = int(os.getenv("DISCORD_SERVER_ID", "0"))
+        if server_id == 0:
+            logging.error("Please set DISCORD_SERVER_ID in your .env file")
+            return
+    
+    # Handle time range
+    if all_messages:
+        print("Backing up ALL messages (this might take a while)...")
+        start_time = None
+        end_time = None
+    else:
+        # Default to last 24 hours if no time range specified
+        if not start_time and not end_time:
+            end_time = datetime.now(timezone.utc)
+            start_time = end_time - timedelta(days=1)
+            print(f"Using default time range (last 24 hours):")
+            print(f"  Start: {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"  End: {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        else:
+            # Make timestamps timezone-aware if they aren't already
+            if start_time and not start_time.tzinfo:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+            if end_time and not end_time.tzinfo:
+                end_time = end_time.replace(tzinfo=timezone.utc)
+            print(f"Using specified time range:")
+            print(f"  Start: {start_time.strftime('%Y-%m-%d %H:%M:%S %Z') if start_time else 'Beginning'}")
+            print(f"  End: {end_time.strftime('%Y-%m-%d %H:%M:%S %Z') if end_time else 'Now'}")
+    
+    # Set up output directory
+    if not output_dir:
+        output_dir = Path("data/discord/backups")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Backup directory: {output_dir}")
+    
+    # Initialize Discord manager
+    manager = DiscordManager(os.getenv("DISCORD_BOT_TOKEN"), str(output_dir))
+    
+    async def run_backup():
+        try:
+            print("Connecting to Discord...")
+            stats = await manager.start_backup(server_id, start_time, end_time)
+            
+            print("\nBackup completed successfully!")
+            print(f"Messages backed up: {stats['message_count']}")
+            print(f"Attachments backed up: {stats['attachment_count']}")
+            print(f"Channels backed up: {stats['channels_backed_up']}")
+            
+            if 'error_count' in stats and stats['error_count'] > 0:
+                print(f"Errors encountered: {stats['error_count']}")
+                
+            print(f"Backup saved to: {output_dir}")
+            
+            logging.info(f"Backup completed. Stats: {stats}")
+        except Exception as e:
+            logging.error(f"Error during backup: {str(e)}")
+            raise
+    
+    # Run the async function
+    asyncio.run(run_backup())
+
+
+def discord_summarize(
+    input_dir: Path,
+    output_dir: Optional[Path] = None,
+    channels: Optional[List[str]] = None,
+    server_id: Optional[str] = None,
+    verbose: bool = False
+) -> None:
+    """Summarize Discord messages from a backup.
+    
+    Args:
+        input_dir: Directory containing message backups
+        output_dir: Optional output directory for summaries
+        channels: Optional list of channel names to summarize (defaults to ['game-building', 'irl', 'tech-analysis', 'sanctuary'])
+        server_id: Optional Discord server ID for message links
+        verbose: Whether to enable verbose logging
+    """
+    setup_logging(verbose)
+    logging.info("Starting Discord message summarization...")
+    
+    # Set up output directory
+    if not output_dir:
+        output_dir = Path("data/discord/summaries")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Set default channels if none provided
+    if not channels:
+        channels = ['game-building', 'irl', 'tech-analysis', 'sanctuary']
+        logging.info(f"Using default channels: {', '.join(channels)}")
+        print(f"Using default channels: {', '.join(channels)}")
+    
+    # Get server ID from environment if not provided
+    if not server_id:
+        server_id = os.getenv("DISCORD_SERVER_ID", "SERVER_ID")
+    
+    # Initialize summarizer
+    summarizer = DiscordMessageSummarizer(
+        model="gpt-4o",
+        format_type=SummaryFormat.MARKDOWN,
+        output_dir=str(output_dir)
+    )
+    
+    # Process each channel's messages
+    total_channels = 0
+    processed_channels = 0
+    
+    for channel_dir in input_dir.iterdir():
+        if not channel_dir.is_dir():
+            continue
+            
+        # Skip channels not in the filter list
+        if channel_dir.name not in channels:
+            logging.info(f"Skipping channel: {channel_dir.name} (not in channel list)")
+            continue
+            
+        messages_file = channel_dir / "messages.json"
+        if not messages_file.exists():
+            logging.warning(f"No messages file found for channel: {channel_dir.name}")
+            continue
+            
+        total_channels += 1
+        logging.info(f"Processing channel: {channel_dir.name}")
+        print(f"Summarizing messages from #{channel_dir.name}...")
+        
+        # Load messages
+        with open(messages_file, 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+            
+        if not messages:
+            logging.info(f"No messages found in channel: {channel_dir.name}")
+            continue
+            
+        # Get channel ID from the first message if available
+        channel_id = None
+        try:
+            # Load server_info.json to find channel ID by name
+            server_info_path = input_dir / "server_info.json"
+            if server_info_path.exists():
+                with open(server_info_path, 'r', encoding='utf-8') as f:
+                    server_info = json.load(f)
+                    for channel_info in server_info.get('channels', []):
+                        if channel_info.get('name') == channel_dir.name:
+                            channel_id = str(channel_info.get('id'))
+                            break
+        except Exception as e:
+            logging.warning(f"Error getting channel ID: {str(e)}")
+        
+        # Generate summary
+        summary_path = output_dir / f"{channel_dir.name}_summary.md"
+        summarizer.summarize_messages(
+            messages, 
+            summary_path,
+            server_id=server_id,
+            channel_id=channel_id
+        )
+        
+        processed_channels += 1
+        print(f"✓ Summary for #{channel_dir.name} saved to {summary_path}")
+        
+    logging.info(f"Summarization completed. Processed {processed_channels} of {total_channels} channels.")
+    print(f"\nSummarization complete! Processed {processed_channels} channels.")
+    print(f"Summaries saved to: {output_dir}")
+
+
+def discord_daily_recap(
+    server_id: Optional[int] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    channels: Optional[List[str]] = None,
+    verbose: bool = False
+) -> None:
+    """Generate a daily recap of Discord server activity.
+    
+    This command first performs a backup of recent messages and then generates 
+    summaries for each channel. Unlike the discord-summarize command (which works
+    on existing backups), this command performs the backup and summarization in one step.
+    
+    Args:
+        server_id: Optional ID of the server to generate recap for (defaults to DISCORD_SERVER_ID from .env)
+        start_time: Optional start time for message filtering
+        end_time: Optional end time for message filtering
+        channels: Optional list of channel names to process (defaults to ['game-building', 'irl', 'tech-analysis', 'sanctuary'])
+        verbose: Whether to enable verbose logging
+    """
+    setup_logging(verbose)
+    logging.info("Starting Discord daily recap generation...")
+    
+    # Get server ID from environment if not provided
+    if server_id is None:
+        server_id = int(os.getenv("DISCORD_SERVER_ID", "0"))
+        if server_id == 0:
+            logging.error("Please set DISCORD_SERVER_ID in your .env file")
+            return
+    
+    # Set up directories
+    backup_dir = Path("data/discord/backups")
+    recap_dir = Path("data/discord/recaps")
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    recap_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Initialize generator
+    generator = DailyRecapGenerator(
+        backup_dir=str(backup_dir),
+        recap_dir=str(recap_dir)
+    )
+    
+    async def run_recap():
+        try:
+            print("Connecting to Discord and backing up messages...")
+            await generator.manager.connect()
+            stats = await generator.generate_recap(server_id, start_time, end_time, channels)
+            
+            print("\nDaily Recap Generation Complete!")
+            print(f"Channels processed: {stats['channels_processed']}")
+            print(f"Total messages summarized: {stats['total_messages']}")
+            print("\nRecap files generated:")
+            for file_path in stats['recap_files']:
+                print(f"  - {file_path}")
+                
+            logging.info(f"Daily recap generation completed. Stats: {stats}")
+        finally:
+            await generator.manager.disconnect()
+    
+    # Run the async function
+    asyncio.run(run_recap())
+
+
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -229,6 +489,31 @@ Examples:
   
   # Run image cracking with a keywords configuration file:
   python -m yzy_investigation.main image-crack --input-dir ./data/raw/yews --config ./yzy_investigation/projects/image_cracking/config/keywords.json
+  
+  # Backup Discord server (past 24 hours only):
+  python -m yzy_investigation.main discord-backup
+  
+  # Backup all Discord messages:
+  python -m yzy_investigation.main discord-backup --all
+  
+  # Backup with time range:
+  python -m yzy_investigation.main discord-backup --start-time "2024-03-20 00:00:00" --end-time "2024-03-21 00:00:00"
+  
+  # OPTION 1: Summarize messages from an existing backup:
+  # Step 1: Create backup first
+  python -m yzy_investigation.main discord-backup --output-dir ./data/discord/backups/my_backup
+  # Step 2: Summarize the backup (uses default channels: game-building, irl, tech-analysis, sanctuary)
+  python -m yzy_investigation.main discord-summarize --input-dir ./data/discord/backups/my_backup
+  
+  # Summarize specific channels with clickable Discord message links:
+  python -m yzy_investigation.main discord-summarize --input-dir ./data/discord/backups/my_backup --channels game-building irl --server-id 1234567890
+  
+  # OPTION 2: Backup AND summarize in one step:
+  # Generate daily recap for the last 24 hours (performs backup and summarization together)
+  python -m yzy_investigation.main discord-daily-recap
+  
+  # Generate recap for specific time range:
+  python -m yzy_investigation.main discord-daily-recap --start-time "2024-03-20 00:00:00" --end-time "2024-03-21 00:00:00"
 """
     )
     
@@ -310,7 +595,90 @@ Examples:
         help="Path to configuration file with keywords and key numbers"
     )
     
-    # Add more subcommands as we implement them
+    # Discord backup command
+    discord_backup_parser = subparsers.add_parser(
+        "discord-backup",
+        help="Backup Discord server messages"
+    )
+    discord_backup_parser.add_argument(
+        "--server-id",
+        type=int,
+        help="ID of the server to backup (defaults to DISCORD_SERVER_ID from .env)"
+    )
+    discord_backup_parser.add_argument(
+        "--start-time",
+        type=str,
+        help="Start time for message filtering (YYYY-MM-DD HH:MM:SS)"
+    )
+    discord_backup_parser.add_argument(
+        "--end-time",
+        type=str,
+        help="End time for message filtering (YYYY-MM-DD HH:MM:SS)"
+    )
+    discord_backup_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Custom output directory for backups"
+    )
+    discord_backup_parser.add_argument(
+        "--all",
+        dest="all_messages",
+        action="store_true",
+        help="Backup all messages regardless of date"
+    )
+    
+    # Discord summarize command
+    discord_summarize_parser = subparsers.add_parser(
+        "discord-summarize",
+        help="Summarize Discord messages from an existing backup directory"
+    )
+    discord_summarize_parser.add_argument(
+        "--input-dir",
+        type=Path,
+        required=True,
+        help="Directory containing message backups"
+    )
+    discord_summarize_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Custom output directory for summaries"
+    )
+    discord_summarize_parser.add_argument(
+        "--channels",
+        nargs="+",
+        help="List of channels to summarize (defaults to game-building, irl, tech-analysis, and sanctuary)"
+    )
+    discord_summarize_parser.add_argument(
+        "--server-id",
+        type=str,
+        help="Discord server ID for message links (defaults to DISCORD_SERVER_ID from .env)"
+    )
+    
+    # Discord daily recap command
+    discord_recap_parser = subparsers.add_parser(
+        "discord-daily-recap",
+        help="Backup recent messages AND generate summaries in one operation"
+    )
+    discord_recap_parser.add_argument(
+        "--server-id",
+        type=int,
+        help="ID of the server to generate recap for (defaults to DISCORD_SERVER_ID from .env)"
+    )
+    discord_recap_parser.add_argument(
+        "--start-time",
+        type=str,
+        help="Start time for message filtering (YYYY-MM-DD HH:MM:SS)"
+    )
+    discord_recap_parser.add_argument(
+        "--end-time",
+        type=str,
+        help="End time for message filtering (YYYY-MM-DD HH:MM:SS)"
+    )
+    discord_recap_parser.add_argument(
+        "--channels",
+        nargs="+",
+        help="List of channels to process (defaults to game-building, irl, tech-analysis, and sanctuary)"
+    )
     
     args = parser.parse_args()
     
@@ -320,6 +688,16 @@ Examples:
         analyze_stego(args.input_dir, args.output_dir, args.strategies, args.verbose)
     elif args.command == "image-crack":
         image_crack(args.input_dir, args.output_dir, args.keywords, args.key_numbers, args.config, args.verbose)
+    elif args.command == "discord-backup":
+        start_time = datetime.strptime(args.start_time, "%Y-%m-%d %H:%M:%S") if args.start_time else None
+        end_time = datetime.strptime(args.end_time, "%Y-%m-%d %H:%M:%S") if args.end_time else None
+        discord_backup(args.server_id, start_time, end_time, args.output_dir, args.all_messages, args.verbose)
+    elif args.command == "discord-summarize":
+        discord_summarize(args.input_dir, args.output_dir, args.channels, args.server_id, args.verbose)
+    elif args.command == "discord-daily-recap":
+        start_time = datetime.strptime(args.start_time, "%Y-%m-%d %H:%M:%S") if args.start_time else None
+        end_time = datetime.strptime(args.end_time, "%Y-%m-%d %H:%M:%S") if args.end_time else None
+        discord_daily_recap(args.server_id, start_time, end_time, args.channels, args.verbose)
     elif args.command is None:
         parser.print_help()
     else:

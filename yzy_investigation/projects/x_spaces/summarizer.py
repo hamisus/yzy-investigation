@@ -8,25 +8,35 @@ combining them into a final cohesive summary.
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Union, Optional, Tuple
+from typing import List, Dict, Any, Union, Optional, Tuple, Literal
 import re
 import concurrent.futures
 from tqdm import tqdm
+from enum import Enum
+from datetime import datetime, timedelta
 
 # For OpenAI API usage
 import os
 import openai
 
+class SummaryFormat(str, Enum):
+    """Enum for different summary formats."""
+    MARKDOWN = "markdown"  # Traditional markdown format with sections
+    TIMELINE = "timeline"  # Chronological bullet points format
 
 class SpaceSummarizer:
     """A class to handle the summarization of X/Twitter Spaces transcriptions."""
+    
+    # Regex pattern for matching timestamps in [HH:MM:SS] format
+    TIMESTAMP_PATTERN = re.compile(r'\[(\d{2}):(\d{2}):(\d{2})\]')
     
     def __init__(self, 
                  api_key: Optional[str] = None, 
                  model: str = "gpt-4o-mini",
                  chunk_size: int = 15000,
                  max_workers: int = 1,
-                 output_dir: Optional[str] = None):
+                 output_dir: Optional[str] = None,
+                 format_type: Union[str, SummaryFormat] = SummaryFormat.TIMELINE):
         """
         Initialize the SpaceSummarizer.
         
@@ -37,6 +47,8 @@ class SpaceSummarizer:
             max_workers: Maximum number of workers for parallel processing.
             output_dir: Optional directory path where summaries will be saved.
                         If None, saves in summaries subdirectory.
+            format_type: The format to use for the summary. Either 'markdown' or 'timeline'.
+                        Defaults to 'timeline' for chronological bullet points.
         """
         # Set up OpenAI API
         if api_key:
@@ -48,7 +60,14 @@ class SpaceSummarizer:
         
         openai.api_key = self.api_key
         self.model = model
-        self.chunk_size = chunk_size
+        
+        # Ensure chunk_size is reasonable
+        if chunk_size < 8000:
+            print("Warning: chunk_size less than 8000 may result in incomplete summaries. Setting to 8000.")
+            self.chunk_size = 8000
+        else:
+            self.chunk_size = chunk_size
+            
         self.max_workers = max_workers
         
         # Set default output directory to 'summaries' subdirectory
@@ -57,6 +76,15 @@ class SpaceSummarizer:
         else:
             # Default to 'summaries' subdirectory in same directory as input file
             self.output_dir = None
+            
+        # Set format type
+        if isinstance(format_type, str):
+            try:
+                self.format_type = SummaryFormat(format_type.lower())
+            except ValueError:
+                raise ValueError(f"Invalid format_type: {format_type}. Must be one of: {[f.value for f in SummaryFormat]}")
+        else:
+            self.format_type = format_type
         
         # Track total token usage
         self.total_prompt_tokens = 0
@@ -196,6 +224,45 @@ class SpaceSummarizer:
         
         return chunks
     
+    def _extract_timestamps(self, text: str) -> List[Tuple[str, int]]:
+        """
+        Extract timestamps from text and convert to seconds for sorting.
+        
+        Args:
+            text: Text containing timestamps in [HH:MM:SS] format
+            
+        Returns:
+            List of tuples containing (original_timestamp, seconds_from_start)
+        """
+        timestamps = []
+        for match in self.TIMESTAMP_PATTERN.finditer(text):
+            timestamp = match.group(0)
+            hours, minutes, seconds = map(int, match.groups())
+            total_seconds = hours * 3600 + minutes * 60 + seconds
+            timestamps.append((timestamp, total_seconds))
+        return sorted(timestamps, key=lambda x: x[1])
+
+    def _format_timestamp_range(self, start_time: int, end_time: int) -> str:
+        """
+        Format a time range in a human-readable format.
+        
+        Args:
+            start_time: Start time in seconds from start
+            end_time: End time in seconds from start
+            
+        Returns:
+            Formatted time range string
+        """
+        def format_time(seconds: int) -> str:
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            secs = seconds % 60
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+            
+        start = format_time(start_time)
+        end = format_time(end_time)
+        return f"[{start}-{end}]"
+
     def _summarize_chunk(self, chunk_text: str, chunk_number: int, total_chunks: int) -> Tuple[str, Dict[str, int]]:
         """
         Summarize a single chunk of transcript using the OpenAI API.
@@ -208,8 +275,18 @@ class SpaceSummarizer:
         Returns:
             Tuple of (summary text, token usage stats)
         """
-        prompt = f"""
+        # Extract timestamps from the chunk
+        timestamps = self._extract_timestamps(chunk_text)
+        time_range = ""
+        if timestamps:
+            start_time = timestamps[0][1]
+            end_time = timestamps[-1][1]
+            time_range = self._format_timestamp_range(start_time, end_time)
+        
+        # Base prompt for all formats
+        base_prompt = f"""
 You are summarizing part {chunk_number} of {total_chunks} from a transcript about a crypto coin called "YzY" or "4NBT" by Ye, formerly known as Kanye West.
+{f'This segment covers the time range {time_range}.' if time_range else ''}
 
 Create a concise, factual summary of the key points in this transcript segment. Focus on:
 - Main topics discussed
@@ -221,8 +298,29 @@ IMPORTANT:
 - Include all important ideas, not just YzY/4NBT-related content
 - Avoid speculation or adding outside knowledge
 - Keep it factual and based only on what is stated in the text
-- Present information in a clear, minutes-style format
+- Preserve timestamps [HH:MM:SS] when they appear in the text
+- Do not omit any significant points or discussions
+"""
 
+        # Format-specific instructions
+        if self.format_type == SummaryFormat.MARKDOWN:
+            base_prompt += """
+- Present information in a clear, structured format using Markdown
+- Use bullet points for distinct items
+- Use *emphasis* for important terms
+- Use > quotes for significant statements
+- Include timestamps at the start of important points when available
+"""
+        else:  # SummaryFormat.TIMELINE
+            base_prompt += """
+- Present information in strict chronological order
+- Start each point with its timestamp [HH:MM:SS] when available
+- Include speaker attribution when clear
+- Keep points concise but complete
+- Group related points that share the same timestamp
+"""
+
+        prompt = base_prompt + f"""
 Here's the transcript segment:
 ----------------
 {chunk_text}
@@ -234,11 +332,10 @@ Here's the transcript segment:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that creates concise, factual summaries."},
+                    {"role": "system", "content": f"You are a helpful assistant that creates concise, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include timestamps [HH:MM:SS] from the original text. Do not omit any significant information."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
-                max_tokens=1000
             )
             
             # Track token usage
@@ -274,7 +371,7 @@ Here's the transcript segment:
             Consolidated final summary
         """
         # If we have too many summaries, merge them in batches
-        MAX_SUMMARIES_PER_BATCH = 3  # Adjust this based on typical summary length
+        MAX_SUMMARIES_PER_BATCH = 5  # Increased from 3 to handle more content per batch
         
         if len(chunk_summaries) > MAX_SUMMARIES_PER_BATCH:
             print(f"\nMerging {len(chunk_summaries)} summaries in batches of {MAX_SUMMARIES_PER_BATCH}...")
@@ -302,10 +399,22 @@ Here's the transcript segment:
         """Merge a small batch of summaries."""
         combined_text = "\n\n".join(summaries)
         
-        prompt = f"""
+        # Base prompt for all formats
+        base_prompt = f"""
 You are creating a{'final' if is_final else 'n intermediate'} summary of a transcript about a crypto coin called "YzY" or "4NBT" by Ye (Kanye West).
 
-{'Below are summaries from different parts of the transcript.' if is_final else 'Below are partial summaries that need to be combined.'} Create a well-structured Markdown summary that:
+{'Below are summaries from different parts of the transcript.' if is_final else 'Below are partial summaries that need to be combined.'}
+
+IMPORTANT: 
+- Always preserve and include the original timestamps [HH:MM:SS] from the text
+- Do not omit any significant information
+- Maintain all important points from each summary
+"""
+
+        # Format-specific prompts
+        if self.format_type == SummaryFormat.MARKDOWN:
+            prompt = base_prompt + """
+Create a well-structured Markdown summary that:
 
 1. Starts with a brief overview paragraph that captures the main themes and key points
 2. Organizes the remaining information into logical sections based on the actual content:
@@ -319,15 +428,49 @@ You are creating a{'final' if is_final else 'n intermediate'} summary of a trans
    - *Emphasis* for important terms or metrics
    - > Quote blocks for significant direct statements
    - Paragraphs for flowing narrative
+   - Include timestamps at the start of important points
 
 4. Maintains factual accuracy:
    - Includes only information from the transcript
    - Preserves important numbers and metrics
    - Notes any conflicting information
    - Avoids speculation
+   - Retains all significant points from the input summaries
 
 IMPORTANT: The structure should emerge from the content. Don't create sections unless they naturally arise from having multiple distinct topics with substantial discussion.
+"""
+        else:  # SummaryFormat.TIMELINE
+            prompt = base_prompt + """
+Create a strictly chronological timeline summary that:
 
+1. Starts with a brief overview paragraph (2-3 sentences) capturing the main themes
+
+2. Lists ALL points in strict chronological order:
+   - Start each point with its timestamp [HH:MM:SS]
+   - Include speaker attribution when available
+   - Keep each point concise but complete
+   - Group closely related points under the same timestamp
+   - Preserve exact numbers, metrics, and important quotes
+   - Retain all significant information from each summary
+
+3. Maintains a clear timeline structure:
+   - Present ALL information in strict chronological order
+   - Use timestamps to mark the progression of discussion
+   - Preserve the exact sequence of events and statements
+   - Group related points that share the same timestamp
+   - Do not skip or omit any timestamps or events
+
+4. Focuses on factual accuracy:
+   - Include only information from the transcript
+   - Preserve important numbers and metrics
+   - Note any conflicting information
+   - Avoid speculation
+   - Maintain all key points from the input summaries
+
+IMPORTANT: Keep the format strictly chronological. Each point must start with its timestamp, and points must be ordered by time. Do not omit any significant information.
+"""
+
+        prompt += f"""
 Here are the summaries to consolidate:
 ----------------
 {combined_text}
@@ -339,11 +482,10 @@ Here are the summaries to consolidate:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that creates well-structured, factual summaries in Markdown format. You adapt the structure to match the content rather than forcing a predefined format."},
+                    {"role": "system", "content": f"You are a helpful assistant that creates well-structured, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include timestamps [HH:MM:SS] from the original text. Do not omit any significant information."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
-                max_tokens=1500
             )
             
             # Track token usage

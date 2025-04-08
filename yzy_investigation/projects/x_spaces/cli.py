@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, NoReturn
 from .downloader import SpaceDownloader
 from .transcriber import SpaceTranscriber
-from .summarizer import SpaceSummarizer
+from .summarizer import SpaceSummarizer, SummaryFormat
 
 
 def handle_error(e: Exception) -> NoReturn:
@@ -58,7 +58,8 @@ def summarize_transcript(args: argparse.Namespace) -> None:
             model=args.model,
             chunk_size=args.chunk_size,
             max_workers=args.max_workers,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            format_type=args.format
         )
         summarizer.summarize_from_file(args.transcript_file)
     except Exception as e:
@@ -180,6 +181,12 @@ def main() -> None:
         help="OpenAI model to use for summarization",
         default="gpt-4o"
     )
+    openai_args.add_argument(
+        "--format",
+        help="Format for the summary output",
+        choices=[f.value for f in SummaryFormat],
+        default=SummaryFormat.TIMELINE.value
+    )
     
     # Summarize command
     summarize_parser = subparsers.add_parser(
@@ -193,9 +200,9 @@ def main() -> None:
     )
     summarize_parser.add_argument(
         "--chunk-size",
-        help="Number of characters per chunk for transcript processing",
+        help="Number of characters per chunk for transcript processing (minimum 8000)",
         type=int,
-        default=8000
+        default=15000
     )
     summarize_parser.add_argument(
         "--max-workers",
@@ -259,9 +266,9 @@ def main() -> None:
     )
     download_transcribe_summarize_parser.add_argument(
         "--chunk-size",
-        help="Number of characters per chunk for transcript processing",
+        help="Number of characters per chunk for transcript processing (minimum 8000)",
         type=int,
-        default=8000
+        default=15000
     )
     download_transcribe_summarize_parser.add_argument(
         "--max-workers",

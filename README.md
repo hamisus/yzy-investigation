@@ -1,6 +1,6 @@
 # YzY Investigation
 
-A Python-based toolkit for investigating the 4NBT (yzY) meme coin phenomenon, including puzzle solving, web scraping, and X spaces downloading capabilities.
+A Python-based toolkit for investigating the 4NBT (yzY) meme coin phenomenon, including puzzle solving, web scraping, X spaces downloading, and Discord management capabilities.
 
 ## Project Structure
 
@@ -12,7 +12,11 @@ yzy-investigation/
 │   └── tests/              # Unit tests
 ├── data/                   # Data storage
 │   ├── raw/               # Raw data
-│   └── processed/         # Processed data
+│   ├── processed/         # Processed data
+│   └── discord/           # Discord data
+│       ├── backups/       # Message backups
+│       ├── summaries/     # Message summaries
+│       └── recaps/        # Daily recaps
 ├── results/               # Output and logs
 └── docs/                  # Documentation
 ```
@@ -42,7 +46,14 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 4. Install Python dependencies:
 ```bash
-pip install -e .
+pip install -r requirements.txt
+```
+
+5. Set up Discord bot token:
+```bash
+# Create .env file in project root
+echo "DISCORD_BOT_TOKEN=your_bot_token_here" >> .env
+echo "DISCORD_SERVER_ID=your_server_id_here" >> .env
 ```
 
 Note: For Apple Silicon (M1/M2/M3) Macs, ensure you have macOS 12.3 or later for proper GPU support with PyTorch/MPS.
@@ -51,26 +62,38 @@ Note: For Apple Silicon (M1/M2/M3) Macs, ensure you have macOS 12.3 or later for
 
 The project includes a command-line interface for running various tools. Here are some examples:
 
+### Discord Manager
+
+The Discord manager provides tools for backing up and analyzing Discord server messages.
+
+```bash
+# Step 1: Backup server messages (past 24 hours by default)
+python -m yzy_investigation.main discord-backup
+
+# Backup all messages (could take a while!)
+python -m yzy_investigation.main discord-backup --all
+
+# Step 2: Summarize messages from the backup
+python -m yzy_investigation.main discord-summarize --input-dir ./data/discord/backups
+
+# Step 3: Generate daily recap
+python -m yzy_investigation.main discord-daily-recap
+
+# Advanced usage with time ranges
+python -m yzy_investigation.main discord-backup --start-time "2024-03-20 00:00:00" --end-time "2024-03-21 00:00:00"
+python -m yzy_investigation.main discord-daily-recap --start-time "2024-03-20 00:00:00" --end-time "2024-03-21 00:00:00"
+```
+
 ### X Spaces Downloader
 
-The X Spaces project allows you to download X/Twitter Spaces audio. Transcription to be added later.
+The X Spaces project allows you to download X/Twitter Spaces audio.
 
 ```bash
 # Download a Space
-python -m yzy_investigation.projects.x_spaces.cli download "https://twitter.com/i/spaces/..."
+python -m yzy_investigation.main x-spaces "https://twitter.com/i/spaces/..."
 
 # Download to a specific directory
-python -m yzy_investigation.projects.x_spaces.cli download "https://twitter.com/i/spaces/..." --output-dir ./my_spaces
-```
-
-You can also use the X Spaces downloader programmatically:
-
-```python
-from yzy_investigation.projects.x_spaces import SpaceDownloader
-
-# Download a Space
-downloader = SpaceDownloader(output_dir="./my_spaces")
-audio_path = downloader.download_space("https://twitter.com/i/spaces/...")
+python -m yzy_investigation.main x-spaces "https://twitter.com/i/spaces/..." --output-dir ./my_spaces
 ```
 
 ### Web Scraper (YEWS.news)
@@ -105,19 +128,19 @@ The stego analysis project provides lower-level tools for analyzing images using
 
 ```bash
 # Analyze a single image
-python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg
+python -m yzy_investigation.main stego-analyze path/to/image.jpg
 
 # Analyze with custom keywords (uses image_cracking project's keywords)
-python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg --use-keywords
+python -m yzy_investigation.main stego-analyze path/to/image.jpg --use-keywords
 
 # Analyze multiple images in a directory
-python -m yzy_investigation.projects.stego_analysis.stego_analyzer batch path/to/directory
+python -m yzy_investigation.main stego-analyze path/to/directory
 
 # Save results to a file
-python -m yzy_investigation.projects.stego_analysis.stego_analyzer analyze path/to/image.jpg -o results.json
+python -m yzy_investigation.main stego-analyze path/to/image.jpg -o results.json
 
 # Specify file extensions for batch analysis
-python -m yzy_investigation.projects.stego_analysis.stego_analyzer batch path/to/directory -e jpg png
+python -m yzy_investigation.main stego-analyze path/to/directory -e jpg png
 ```
 
 ## Development
