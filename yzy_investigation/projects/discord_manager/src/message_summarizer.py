@@ -397,9 +397,9 @@ class DiscordMessageSummarizer:
                         - Do not omit any significant information
                         - Maintain all important points from each summary
                         - Include message IDs for reference when relevant
-                        - Include the author and usernames of individuals involved in each specific discussion.
+                        - Include the author and usernames and entities involved in each specific discussion.
                         - For all significant messages, include a Discord message link in the format:
-                        [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
+                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
                         where MESSAGE_ID is the ID of the message you are referencing
                         """
 
@@ -423,7 +423,7 @@ class DiscordMessageSummarizer:
                                     - Paragraphs for flowing narrative
                                     - Include timestamps at the start of important points
                                     - For significant messages, include a Discord message link using the format:
-                                        [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
+                                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
                                         This will let readers click directly to original messages
 
                                     4. Maintains factual accuracy:
@@ -439,7 +439,7 @@ class DiscordMessageSummarizer:
 
                                     1. Lists ALL points in chronological order:
                                     - For significant messages, include a Discord message link using the format:
-                                        [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
+                                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
                                     - Keep each point concise but complete
                                     - Group closely related points together
                                     - Preserve exact numbers, metrics, and important quotes
