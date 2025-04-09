@@ -33,6 +33,7 @@ from yzy_investigation.projects.image_cracking.scripts.image_crack_cli import Im
 from yzy_investigation.projects.discord_manager.src.discord_manager import DiscordManager
 from yzy_investigation.projects.discord_manager.src.message_summarizer import DiscordMessageSummarizer, SummaryFormat
 from yzy_investigation.projects.discord_manager.src.daily_recap import DailyRecapGenerator
+from yzy_investigation.projects.discord_manager.src.summary_publisher import SummaryPublisher
 # Import other project modules as they are implemented
 
 
@@ -330,7 +331,8 @@ def discord_summarize(
     # Initialize summarizer
     summarizer = DiscordMessageSummarizer(
         model="gpt-4o",
-        format_type=SummaryFormat.MARKDOWN,
+        # format_type=SummaryFormat.MARKDOWN,
+        format_type=SummaryFormat.TIMELINE,
         output_dir=str(output_dir)
     )
     
@@ -459,6 +461,67 @@ def discord_daily_recap(
     asyncio.run(run_recap())
 
 
+def discord_publish_summary(
+    summary_path: Path,
+    test_mode: bool = False,
+    include_overview: bool = True,
+    delay: float = 1.0,
+    verbose: bool = False
+) -> None:
+    """Publish a summary to a Discord channel.
+    
+    Args:
+        summary_path: Path to the summary markdown file
+        test_mode: Whether to use test server and channel IDs
+        include_overview: Whether to include the overview paragraph
+        delay: Delay between messages in seconds
+        verbose: Whether to enable verbose logging
+    """
+    setup_logging(verbose)
+    logging.info(f"Starting Discord summary publishing for: {summary_path}")
+    
+    # Verify the summary file exists
+    if not summary_path.exists():
+        logging.error(f"Summary file not found: {summary_path}")
+        print(f"Error: Summary file not found: {summary_path}")
+        return
+    
+    # Initialize publisher
+    publisher = SummaryPublisher(test_mode=test_mode)
+    
+    # Which mode we're using for logging purposes
+    mode = "TEST" if test_mode else "PRODUCTION"
+    logging.info(f"Using {mode} mode")
+    print(f"Using {mode} mode")
+    
+    async def run_publisher():
+        try:
+            print(f"Publishing summary from: {summary_path}")
+            print(f"Connecting to Discord...")
+            
+            stats = await publisher.start(
+                str(summary_path),
+                include_overview=include_overview,
+                delay=delay
+            )
+            
+            print("\nSummary Publishing Complete!")
+            print(f"Messages sent: {stats['messages_sent']}")
+            print(f"Bullet points sent: {stats['bullet_points_sent']}")
+            if stats['errors'] > 0:
+                print(f"Errors encountered: {stats['errors']}")
+                
+            logging.info(f"Publishing completed. Stats: {stats}")
+            
+        except Exception as e:
+            error_msg = f"Error publishing summary: {str(e)}"
+            logging.error(error_msg)
+            print(f"Error: {error_msg}")
+    
+    # Run the async function
+    asyncio.run(run_publisher())
+
+
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -514,6 +577,12 @@ Examples:
   
   # Generate recap for specific time range:
   python -m yzy_investigation.main discord-daily-recap --start-time "2024-03-20 00:00:00" --end-time "2024-03-21 00:00:00"
+  
+  # Publish a summary to Discord:
+  python -m yzy_investigation.main discord-publish-summary --summary-path ./data/discord/summaries/game-building_summary.md
+  
+  # Publish a summary to Discord test environment:
+  python -m yzy_investigation.main discord-publish-summary --summary-path ./data/discord/summaries/game-building_summary.md --test-mode
 """
     )
     
@@ -680,6 +749,35 @@ Examples:
         help="List of channels to process (defaults to game-building, irl, tech-analysis, and sanctuary)"
     )
     
+    # Discord publish summary command
+    discord_publish_parser = subparsers.add_parser(
+        "discord-publish-summary",
+        help="Publish a summary to a Discord channel"
+    )
+    discord_publish_parser.add_argument(
+        "--summary-path",
+        type=Path,
+        required=True,
+        help="Path to the summary markdown file to publish"
+    )
+    discord_publish_parser.add_argument(
+        "--test-mode",
+        action="store_true",
+        help="Use test server and channel IDs from environment variables"
+    )
+    discord_publish_parser.add_argument(
+        "--include-overview",
+        action="store_true",
+        default=True,
+        help="Include the overview paragraph in the published messages"
+    )
+    discord_publish_parser.add_argument(
+        "--delay",
+        type=float,
+        default=1.0,
+        help="Delay between messages in seconds to avoid rate limiting"
+    )
+    
     args = parser.parse_args()
     
     if args.command == "scrape-yews":
@@ -698,6 +796,8 @@ Examples:
         start_time = datetime.strptime(args.start_time, "%Y-%m-%d %H:%M:%S") if args.start_time else None
         end_time = datetime.strptime(args.end_time, "%Y-%m-%d %H:%M:%S") if args.end_time else None
         discord_daily_recap(args.server_id, start_time, end_time, args.channels, args.verbose)
+    elif args.command == "discord-publish-summary":
+        discord_publish_summary(args.summary_path, args.test_mode, args.include_overview, args.delay, args.verbose)
     elif args.command is None:
         parser.print_help()
     else:

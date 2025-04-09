@@ -9,6 +9,7 @@ import os
 from dotenv import load_dotenv
 
 from yzy_investigation.projects.discord_manager.src.daily_recap import DailyRecapGenerator
+from yzy_investigation.projects.discord_manager.src.summary_publisher import SummaryPublisher
 
 def parse_args():
     """Parse command line arguments."""
@@ -36,6 +37,31 @@ def parse_args():
         "--recap-dir",
         type=str,
         help="Directory to store recaps"
+    )
+    
+    # Publish summary command
+    publish_parser = subparsers.add_parser("publish-summary", help="Publish summary bullet points to Discord")
+    publish_parser.add_argument(
+        "summary_path",
+        type=str,
+        help="Path to the summary markdown file"
+    )
+    publish_parser.add_argument(
+        "--test-mode",
+        action="store_true",
+        help="Use test server and channel IDs from environment variables"
+    )
+    publish_parser.add_argument(
+        "--include-overview",
+        action="store_true",
+        default=True,
+        help="Include the overview paragraph in the published messages"
+    )
+    publish_parser.add_argument(
+        "--delay",
+        type=float,
+        default=1.0,
+        help="Delay between messages in seconds to avoid rate limiting"
     )
     
     return parser.parse_args()
@@ -82,12 +108,39 @@ async def run_daily_recap(args):
     finally:
         await generator.manager.disconnect()
 
+async def run_publish_summary(args):
+    """Run the summary publisher."""
+    # Load environment variables
+    load_dotenv()
+    
+    # Initialize publisher
+    publisher = SummaryPublisher(test_mode=args.test_mode)
+    
+    try:
+        # Publish summary
+        stats = await publisher.start(
+            args.summary_path,
+            include_overview=args.include_overview,
+            delay=args.delay
+        )
+        
+        print("\nSummary Publishing Complete!")
+        print(f"Messages sent: {stats['messages_sent']}")
+        print(f"Bullet points sent: {stats['bullet_points_sent']}")
+        if stats['errors'] > 0:
+            print(f"Errors encountered: {stats['errors']}")
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
 def main():
     """Main entry point."""
     args = parse_args()
     
     if args.command == "daily-recap":
         asyncio.run(run_daily_recap(args))
+    elif args.command == "publish-summary":
+        asyncio.run(run_publish_summary(args))
     else:
         print("Please specify a command. Use --help for more information.")
 

@@ -200,62 +200,65 @@ class DiscordMessageSummarizer:
         
         # Base prompt for all formats
         base_prompt = f"""
-You are summarizing part {chunk_number} of {total_chunks} from a Discord channel's message history.
+                    You are summarizing part {chunk_number} of {total_chunks} from a Discord channel's message history.
 
-Create a concise, factual summary of the key points in this message segment. Focus on:
-- Main topics discussed
-- Important announcements or updates
-- Questions asked and their answers
-- Key decisions or action items
-- Any other significant information
+                    Create a concise, factual summary of the key points in this message segment. Focus on:
+                    - Main topics discussed
+                    - Important announcements or updates
+                    - Questions asked and their answers
+                    - Key decisions or action items
+                    - Any other significant information
 
-IMPORTANT:
-- Include all important ideas
-- Avoid speculation or adding outside knowledge
-- Keep it factual and based only on what is stated in the messages
-- Preserve timestamps when they appear in the text
-- Do not omit any significant points or discussions
-- For significant messages, extract their message ID from the <!-- msg:ID --> comment and include a link in this format:
-  @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-"""
+                    IMPORTANT:
+                    - Include all important ideas
+                    - Avoid speculation or adding outside knowledge
+                    - Keep it factual and based only on what is stated in the messages
+                    - Do not omit any significant points or discussions
+                    - Include the author and usernames of individuals involved in the discussion.
+                    - For significant messages, extract their message ID from the <!-- msg:ID --> comment and include a link in this format:
+                    @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                    """
 
         # Format-specific instructions
         if self.format_type == SummaryFormat.MARKDOWN:
             base_prompt += f"""
-- Present information in a clear, structured format using Markdown
-- Use bullet points for distinct items
-- Use *emphasis* for important terms
-- Use > quotes for significant statements
-- Include timestamps at the start of important points
-- For significant messages, include their Discord message link using the exact format:
-  @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-"""
+                            - Present information in a clear, structured format using Markdown
+                            - Use bullet points for distinct items
+                            - Use *emphasis* for important terms
+                            - Use > quotes for significant statements
+                            - Include timestamps at the start of important points
+                            - For significant messages, include their Discord message link using the exact format:
+                            @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                            """
         else:  # SummaryFormat.TIMELINE
             base_prompt += f"""
-- Present information in strict chronological order
-- Start each point with its timestamp [HH:MM]
-- For significant messages, include their Discord message link using the exact format:
-  @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-- Keep points concise but complete
-- Group closely related points under the same timestamp
-"""
+                            - Present information in chronological order
+                            - For significant messages, include their Discord message link using the exact format:
+                            @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                            - Keep points concise but complete
+                            - Group closely related points together
+                            - You may use markdown formating appropriately to:
+                                - Use bullet points for distinct items
+                                - Use *emphasis* for important terms
+                                - Use > quotes for significant statements
+                            """
 
         prompt = base_prompt + f"""
-Here are the messages to summarize:
-----------------
-{messages_text}
-----------------
+                                Here are the messages to summarize:
+                                ----------------
+                                {messages_text}
+                                ----------------
 
-IMPORTANT: When referencing messages, use the exact format @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-Extract the message ID from the <!-- msg:ID --> comment in the message text.
-"""
+                                IMPORTANT: When referencing messages, use the exact format @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                                Extract the message ID from the <!-- msg:ID --> comment in the message text.
+                                """
         
         try:
             client = openai.OpenAI(api_key=self.api_key)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that creates concise, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include timestamps from the original messages. Do not omit any significant information. Always include Discord message links for important messages using the format: @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID."},
+                    {"role": "system", "content": f"You are a helpful assistant that creates concise, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Do not omit any significant information. Always include Discord message links for important messages using the format: @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
@@ -391,10 +394,10 @@ Extract the message ID from the <!-- msg:ID --> comment in the message text.
                         You are creating a final summary of a Discord channel's message history.
 
                         IMPORTANT: 
-                        - Always preserve and include the original timestamps from the messages
                         - Do not omit any significant information
                         - Maintain all important points from each summary
                         - Include message IDs for reference when relevant
+                        - Include the author and usernames of individuals involved in each specific discussion.
                         - For all significant messages, include a Discord message link in the format:
                         [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
                         where MESSAGE_ID is the ID of the message you are referencing
@@ -434,25 +437,21 @@ Extract the message ID from the <!-- msg:ID --> comment in the message text.
             prompt = base_prompt + f"""
                                     Create a strictly chronological timeline summary that:
 
-                                    1. Starts with a brief overview paragraph (2-3 sentences) capturing the main themes
-
-                                    2. Lists ALL points in strict chronological order:
-                                    - Start each point with its timestamp [HH:MM]
+                                    1. Lists ALL points in chronological order:
                                     - For significant messages, include a Discord message link using the format:
                                         [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
                                     - Keep each point concise but complete
-                                    - Group closely related points under the same timestamp
+                                    - Group closely related points together
                                     - Preserve exact numbers, metrics, and important quotes
                                     - Retain all significant information from each summary
 
-                                    3. Maintains a clear timeline structure:
-                                    - Present ALL information in strict chronological order
-                                    - Use timestamps to mark the progression of discussion
+                                    2. Maintains a clear timeline structure:
+                                    - Present ALL information in chronological order
                                     - Preserve the exact sequence of events and statements
-                                    - Group related points that share the same timestamp
-                                    - Do not skip or omit any timestamps or events
+                                    - Group related points that share the same topic
+                                    - Do not skip or omit any events
 
-                                    4. Focuses on factual accuracy:
+                                    3. Focuses on factual accuracy:
                                     - Include only information from the messages
                                     - Preserve important numbers and metrics
                                     - Note any conflicting information
@@ -472,7 +471,7 @@ Extract the message ID from the <!-- msg:ID --> comment in the message text.
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that creates well-structured, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include URLs from the original messages. Do not omit any significant information. Always include Discord message links for important messages using the format: [View Message](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)."},
+                    {"role": "system", "content": f"You are a helpful assistant that creates well-structured, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include URLs from the original messages. Do not omit any useful information. Always include Discord message links for important messages using the format: [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
