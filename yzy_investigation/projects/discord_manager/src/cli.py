@@ -126,7 +126,7 @@ async def run_publish_summary(args):
         
         print("\nSummary Publishing Complete!")
         print(f"Messages sent: {stats['messages_sent']}")
-        print(f"Bullet points sent: {stats['bullet_points_sent']}")
+        print(f"Topics sent: {stats['topics_sent']}")
         if stats['errors'] > 0:
             print(f"Errors encountered: {stats['errors']}")
             

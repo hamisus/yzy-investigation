@@ -202,7 +202,13 @@ class DiscordMessageSummarizer:
         base_prompt = f"""
                     You are summarizing part {chunk_number} of {total_chunks} from a Discord channel's message history.
 
-                    Create a concise, factual summary of the key points in this message segment. Focus on:
+                    Create a JSON array with multiple distinct topics covering the key points in this message segment.
+                    Each topic in the array should have:
+                    - "topic": A brief title for the discussion
+                    - "details": An array of bullet points about this topic
+                    - "sources": An array of message URLs for relevant messages
+
+                    Focus on:
                     - Main topics discussed
                     - Important announcements or updates
                     - Questions asked and their answers
@@ -211,37 +217,14 @@ class DiscordMessageSummarizer:
 
                     IMPORTANT:
                     - Include all important ideas
+                    - Organize content into multiple distinct topics
                     - Avoid speculation or adding outside knowledge
                     - Keep it factual and based only on what is stated in the messages
                     - Do not omit any significant points or discussions
                     - Include the author and usernames of individuals involved in the discussion.
                     - For significant messages, extract their message ID from the <!-- msg:ID --> comment and include a link in this format:
-                    @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                    https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
                     """
-
-        # Format-specific instructions
-        if self.format_type == SummaryFormat.MARKDOWN:
-            base_prompt += f"""
-                            - Present information in a clear, structured format using Markdown
-                            - Use bullet points for distinct items
-                            - Use *emphasis* for important terms
-                            - Use > quotes for significant statements
-                            - Include timestamps at the start of important points
-                            - For significant messages, include their Discord message link using the exact format:
-                            @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-                            """
-        else:  # SummaryFormat.TIMELINE
-            base_prompt += f"""
-                            - Present information in chronological order
-                            - For significant messages, include their Discord message link using the exact format:
-                            @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
-                            - Keep points concise but complete
-                            - Group closely related points together
-                            - You may use markdown formating appropriately to:
-                                - Use bullet points for distinct items
-                                - Use *emphasis* for important terms
-                                - Use > quotes for significant statements
-                            """
 
         prompt = base_prompt + f"""
                                 Here are the messages to summarize:
@@ -249,7 +232,20 @@ class DiscordMessageSummarizer:
                                 {messages_text}
                                 ----------------
 
-                                IMPORTANT: When referencing messages, use the exact format @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID
+                                IMPORTANT: The response MUST be a valid JSON array with the format:
+                                [
+                                  {{
+                                    "topic": "Discussion Topic 1",
+                                    "details": ["Detail 1", "Detail 2", "Detail 3"],
+                                    "sources": ["https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID"]
+                                  }},
+                                  {{
+                                    "topic": "Discussion Topic 2",
+                                    "details": ["Detail 1", "Detail 2"],
+                                    "sources": ["https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID"]
+                                  }}
+                                ]
+                                
                                 Extract the message ID from the <!-- msg:ID --> comment in the message text.
                                 """
         
@@ -258,10 +254,11 @@ class DiscordMessageSummarizer:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that creates concise, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Do not omit any significant information. Always include Discord message links for important messages using the format: @https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID."},
+                    {"role": "system", "content": f"You are a specialized JSON summarizer that creates concise, structured summaries in JSON format. Your output must be a valid JSON array with multiple topic objects. Each object must have 'topic', 'details' (array of points), and 'sources' (array of URLs) fields. Include Discord message links for important messages using the format: https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
+                response_format={"type": "json_object"}
             )
             
             # Track token usage
@@ -285,9 +282,233 @@ class DiscordMessageSummarizer:
             print(f"  Completion tokens: {usage['completion_tokens']}")
             print(f"  Cost: ${chunk_cost:.4f}")
             
-            return response.choices[0].message.content.strip(), usage
+            content = response.choices[0].message.content.strip()
+            
+            # Validate the output is a proper JSON array
+            try:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    print(f"Warning: Chunk {chunk_number} returned a single object instead of an array. Converting to array.")
+                    data = [data]
+                    content = json.dumps(data, indent=2)
+                
+                print(f"Chunk {chunk_number} generated {len(data)} topics")
+            except json.JSONDecodeError:
+                print(f"Warning: Chunk {chunk_number} returned invalid JSON. Using raw content.")
+            
+            return content, usage
         except Exception as e:
             raise Exception(f"Failed to summarize chunk {chunk_number}: {str(e)}")
+
+    def _merge_summaries(self, chunk_summaries: List[str], server_id: str = "SERVER_ID", channel_id: str = "CHANNEL_ID") -> str:
+        """Merge individual chunk summaries into a cohesive final summary.
+        
+        Args:
+            chunk_summaries: List of summaries from individual chunks
+            server_id: Discord server ID for message links
+            channel_id: Discord channel ID for message links
+            
+        Returns:
+            Consolidated final summary in JSON format
+        """
+        combined_text = "\n\n".join(chunk_summaries)
+        
+        print(f"Merging {len(chunk_summaries)} chunk summaries")
+        
+        # Base prompt for all formats - keep most of the original
+        base_prompt = f"""
+                        You are creating a final summary of a Discord channel's message history.
+
+                        IMPORTANT: 
+                        - Return the summary as a valid JSON ARRAY with MULTIPLE distinct topics
+                        - Do NOT merge all information into a single topic
+                        - Your response must be an array of objects in JSON format with AT LEAST 5-10 distinct topics
+                        - ALL topics must include a "details" array, even if it only has one item
+                        - The response must look like: [{{"topic": "Topic 1", "details": ["point 1", "point 2", "point 3"],...}}, {{"topic": "Topic 2", "details": ["point 1"],...}}]
+                        - Keep topics separate and distinct - don't combine different discussions into one topic
+                        - Do not omit any significant information
+                        - Break down complex topics into multiple detailed bullet points
+                        - Maintain all important points from each summary
+                        - Include message IDs for reference when relevant
+                        - Include the author and usernames and entities involved in each specific discussion.
+                        - For all significant messages, include a Discord message link in the format:
+                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
+                        where MESSAGE_ID is the ID of the message you are referencing
+                        """
+
+        # Expected output format example
+        example_format = """
+        Here's the exact JSON format I need:
+
+        [
+          {
+            "topic": "Discussion on Ye's Tweet and Codes",
+            "details": [
+              "flochst speculated on hidden meanings in Ye's tweet related to '4NBT', leading to a series of messages attempting to decode these symbols",
+              "User414 responded with additional theories about potential double meanings in the tweet",
+              "The community formed multiple interpretations about possible links to earlier cryptic messages"
+            ],
+            "sources": [
+              "https://discord.com/channels/{server_id}/{channel_id}/123456789",
+              "https://discord.com/channels/{server_id}/{channel_id}/987654321"
+            ]
+          },
+          {
+            "topic": "Community Investment Discussion",
+            "details": [
+              "Users prawnomics and actuallyethane expressed enthusiasm for investing in '4NBT'",
+              "Discussions about risk assessment and potential return on investment followed",
+              "Several members shared strategies for position sizing and entry points"
+            ],
+            "sources": [
+              "https://discord.com/channels/{server_id}/{channel_id}/123456789"
+            ]
+          },
+          {
+            "topic": "Technical Updates",
+            "details": [
+              "Developer announced progress on feature X, responding to user questions about timeline"
+            ],
+            "sources": [
+              "https://discord.com/channels/{server_id}/{channel_id}/123456789"
+            ]
+          }
+        ]
+        
+        Note that this is a JSON array, not a single object.
+        ALL topics must use a 'details' array of points, even if there's only one point.
+        """
+
+        # Format-specific prompts
+        if self.format_type == SummaryFormat.MARKDOWN:
+            prompt = base_prompt + f"""
+                                    Create a well-structured summary formatted as a JSON array where each element has:
+                                    - "topic": A string for the section title (e.g., "Community Updates", "Technical Discussion")
+                                    - "details": An array containing MULTIPLE bulletin points about the topic (not just one)
+                                    - "sources": An array of relevant Discord message links
+
+                                    Your summary should:
+                                    1. Include all key information that captures the main themes and key points
+                                    2. Organize information into MULTIPLE distinct topics (at least 5-10)
+                                    3. Use appropriate formatting within the details text:
+                                       - Each detail should be a complete, informative bulletin point
+                                       - Provide multiple (at least 2-3) bullet points per topic to ensure comprehensive coverage
+                                       - Use *emphasis* for important terms or metrics
+                                       - Include all significant information from the input
+                                    4. Maintain factual accuracy:
+                                       - Include only information from the messages
+                                       - Preserve important numbers and metrics
+                                       - Notes any conflicting information
+                                       - Avoid speculation
+                                       - Retain all significant points from the input summaries
+"""
+        else:  # SummaryFormat.TIMELINE
+            prompt = base_prompt + f"""
+                                    Create a chronological timeline summary formatted as a JSON array where each element has:
+                                    - "topic": A brief descriptive title for this discussion point 
+                                    - "details": An array containing points about this topic (even if only one)
+                                    - "sources": An array of relevant Discord message links
+
+                                    Your JSON array should maintain a timeline structure where:
+                                    1. The array includes MULTIPLE distinct topics (at least 5-10)
+                                    2. All points are in chronological order
+                                    3. Each point is concise but complete
+                                    4. Related points are grouped by topic
+                                    5. All significant details are preserved including:
+                                       - Exact numbers and metrics
+                                       - Important quotes
+                                       - Key discussions and their participants
+                                    6. The factual accuracy is maintained:
+                                       - Only information from the messages is included
+                                       - Conflicting information is noted
+                                       - No speculation is added
+                                       - All key points from the input summaries are retained
+                                    """
+
+        prompt += f"""
+                    Here are the summaries to consolidate:
+                    ----------------
+                    {combined_text}
+                    ----------------
+
+                    CRITICAL: Return your response as a valid JSON ARRAY of MULTIPLE distinct topic objects.
+                    The final JSON must be an array starting with [ and ending with ] containing AT LEAST 5-10 different topic objects.
+                    Each object in the array should represent a separate topic or point of discussion.
+                    DO NOT merge all information into a single topic.
+
+                    {example_format}
+                    """
+        
+        try:
+            client = openai.OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": f"You are a helpful assistant that creates well-structured, factual summaries as valid JSON. Your output must be a valid JSON ARRAY (not a single object) without any explanatory text. The array MUST contain MULTIPLE distinct topic objects (at least 5-10), each with 'topic', 'details' (an array of bullet points, even if only one), and a 'sources' array of links. Always use 'details' array even for simple topics."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                response_format={"type": "json_object"}
+            )
+            
+            # Track token usage
+            self.total_prompt_tokens += response.usage.prompt_tokens
+            self.total_completion_tokens += response.usage.completion_tokens
+            
+            # Calculate and track cost
+            merge_cost = self._calculate_cost(
+                self.model,
+                response.usage.prompt_tokens,
+                response.usage.completion_tokens
+            )
+            self.total_cost += merge_cost
+            
+            print(f"\nMerge token usage:")
+            print(f"  Prompt tokens: {response.usage.prompt_tokens}")
+            print(f"  Completion tokens: {response.usage.completion_tokens}")
+            print(f"  Cost: ${merge_cost:.4f}")
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Check if the response is a JSON array or object
+            try:
+                data = json.loads(content)
+                # If it's a single object, wrap it in an array
+                if isinstance(data, dict):
+                    print("Warning: OpenAI returned a single object instead of an array. Converting to array.")
+                    data = [data]
+                    content = json.dumps(data, indent=2)
+                
+                # Check the number of topics
+                if isinstance(data, list):
+                    print(f"Received {len(data)} topics in the summary")
+                    if len(data) < 2 and len(chunk_summaries) > 1:
+                        print("Warning: OpenAI merged everything into a single topic. Attempting to create multiple topics.")
+                        
+                        # Try to extract multiple topics from the chunk summaries
+                        all_topics = []
+                        for chunk in chunk_summaries:
+                            try:
+                                # See if any chunk contains a list of topics
+                                chunk_data = json.loads(chunk)
+                                if isinstance(chunk_data, list):
+                                    all_topics.extend(chunk_data)
+                                elif isinstance(chunk_data, dict):
+                                    all_topics.append(chunk_data)
+                            except json.JSONDecodeError:
+                                # Not valid JSON, just skip
+                                pass
+                        
+                        if len(all_topics) > 1:
+                            print(f"Extracted {len(all_topics)} topics from individual chunks")
+                            # Use these topics instead
+                            content = json.dumps(all_topics, indent=2)
+            except json.JSONDecodeError:
+                print("Warning: Invalid JSON returned. Returning as-is.")
+            
+            return content
+        except Exception as e:
+            raise Exception(f"Failed to merge summaries: {str(e)}")
 
     def summarize_messages(
         self, 
@@ -305,7 +526,7 @@ class DiscordMessageSummarizer:
             channel_id: Optional Discord channel ID for message links
             
         Returns:
-            The final summary text
+            The final summary text as JSON
         """
         # Reset token tracking
         self.total_prompt_tokens = 0
@@ -368,132 +589,18 @@ class DiscordMessageSummarizer:
         
         # Save if requested
         if output_path:
+            # Update file extension to json if not already specified
             output_path = Path(output_path)
+            if output_path.suffix.lower() != '.json':
+                # If original had .md, replace it, otherwise just add .json
+                if output_path.suffix.lower() == '.md':
+                    output_path = output_path.with_suffix('.json')
+                else:
+                    output_path = Path(str(output_path) + '.json')
+                    
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(final_summary)
             print(f"\nSummary saved to: {output_path}")
         
-        return final_summary
-
-    def _merge_summaries(self, chunk_summaries: List[str], server_id: str = "SERVER_ID", channel_id: str = "CHANNEL_ID") -> str:
-        """Merge individual chunk summaries into a cohesive final summary.
-        
-        Args:
-            chunk_summaries: List of summaries from individual chunks
-            server_id: Discord server ID for message links
-            channel_id: Discord channel ID for message links
-            
-        Returns:
-            Consolidated final summary
-        """
-        combined_text = "\n\n".join(chunk_summaries)
-        
-        # Base prompt for all formats
-        base_prompt = f"""
-                        You are creating a final summary of a Discord channel's message history.
-
-                        IMPORTANT: 
-                        - Do not omit any significant information
-                        - Maintain all important points from each summary
-                        - Include message IDs for reference when relevant
-                        - Include the author and usernames and entities involved in each specific discussion.
-                        - For all significant messages, include a Discord message link in the format:
-                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
-                        where MESSAGE_ID is the ID of the message you are referencing
-                        """
-
-        # Format-specific prompts
-        if self.format_type == SummaryFormat.MARKDOWN:
-            prompt = base_prompt + f"""
-                                    Create a well-structured Markdown summary that:
-
-                                    1. Starts with a brief overview paragraph that captures the main themes and key points
-
-                                    2. Organizes the remaining information into logical sections based on the actual content:
-                                    - Use level 1 headers (# ) only for major themes that have substantial discussion
-                                    - Use level 2 headers (## ) sparingly for significant subtopics
-                                    - If there are only 1-2 main topics, prefer a simpler structure without many headers
-                                    - Let the content dictate the organization - don't force a specific structure
-
-                                    3. Uses appropriate Markdown formatting:
-                                    - Bullet points for lists of related items
-                                    - *Emphasis* for important terms or metrics
-                                    - > Quote blocks for significant direct statements
-                                    - Paragraphs for flowing narrative
-                                    - Include timestamps at the start of important points
-                                    - For significant messages, include a Discord message link using the format:
-                                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
-                                        This will let readers click directly to original messages
-
-                                    4. Maintains factual accuracy:
-                                    - Includes only information from the messages
-                                    - Preserves important numbers and metrics
-                                    - Notes any conflicting information
-                                    - Avoids speculation
-                                    - Retains all significant points from the input summaries
-"""
-        else:  # SummaryFormat.TIMELINE
-            prompt = base_prompt + f"""
-                                    Create a strictly chronological timeline summary that:
-
-                                    1. Lists ALL points in chronological order:
-                                    - For significant messages, include a Discord message link using the format:
-                                        [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)
-                                    - Keep each point concise but complete
-                                    - Group closely related points together
-                                    - Preserve exact numbers, metrics, and important quotes
-                                    - Retain all significant information from each summary
-
-                                    2. Maintains a clear timeline structure:
-                                    - Present ALL information in chronological order
-                                    - Preserve the exact sequence of events and statements
-                                    - Group related points that share the same topic
-                                    - Do not skip or omit any events
-
-                                    3. Focuses on factual accuracy:
-                                    - Include only information from the messages
-                                    - Preserve important numbers and metrics
-                                    - Note any conflicting information
-                                    - Avoid speculation
-                                    - Maintain all key points from the input summaries
-                                    """
-
-        prompt += f"""
-                    Here are the summaries to consolidate:
-                    ----------------
-                    {combined_text}
-                    ----------------
-                    """
-        
-        try:
-            client = openai.OpenAI(api_key=self.api_key)
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": f"You are a helpful assistant that creates well-structured, factual summaries in {'Markdown' if self.format_type == SummaryFormat.MARKDOWN else 'timeline'} format. Always preserve and include URLs from the original messages. Do not omit any useful information. Always include Discord message links for important messages using the format: [Source](https://discord.com/channels/{server_id}/{channel_id}/MESSAGE_ID)."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-            )
-            
-            # Track token usage
-            self.total_prompt_tokens += response.usage.prompt_tokens
-            self.total_completion_tokens += response.usage.completion_tokens
-            
-            # Calculate and track cost
-            merge_cost = self._calculate_cost(
-                self.model,
-                response.usage.prompt_tokens,
-                response.usage.completion_tokens
-            )
-            self.total_cost += merge_cost
-            
-            print(f"\nMerge token usage:")
-            print(f"  Prompt tokens: {response.usage.prompt_tokens}")
-            print(f"  Completion tokens: {response.usage.completion_tokens}")
-            print(f"  Cost: ${merge_cost:.4f}")
-            
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            raise Exception(f"Failed to merge summaries: {str(e)}") 
+        return final_summary 

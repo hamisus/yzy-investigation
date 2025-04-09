@@ -9,6 +9,7 @@ import os
 import sys
 import asyncio
 import re
+import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import argparse
@@ -31,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 class SummaryPublisher:
     """Class for publishing summary bullet points to Discord channels."""
+    
+    # Discord message character limit
+    MAX_MESSAGE_LENGTH = 2000  # Setting to 2000 to be safe (actual limit is 4000)
     
     def __init__(
         self, 
@@ -84,32 +88,146 @@ class SummaryPublisher:
             logger.info(f"Bot logged in as {self.client.user}")
             self.is_ready.set()
     
-    async def parse_summary_file(self, file_path: str) -> Tuple[str, List[str]]:
+    async def parse_summary_file(self, file_path: str) -> Tuple[str, List[Dict[str, Any]]]:
         """
-        Parse a summary file and extract bullet points.
+        Parse a summary JSON file and extract topics.
         
         Args:
-            file_path: Path to the summary file
+            file_path: Path to the summary JSON file
             
         Returns:
-            Tuple containing (overview text, list of bullet points)
+            Tuple containing (overview text, list of topic dictionaries)
         """
+        logger.info(f"Opening file: {file_path}")
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
+            
+        logger.info(f"File content length: {len(content)} characters")
         
-        # Extract overview (first paragraph before bullet points)
-        overview_match = re.search(r'^(.+?)(?=\n-|\Z)', content, re.DOTALL)
-        overview = overview_match.group(1).strip() if overview_match else ""
+        # Parse the JSON content
+        try:
+            data = json.loads(content)
+            logger.info(f"Successfully parsed JSON with {len(data)} entries")
+            
+            # Extract all topics from the nested structure
+            all_topics = []
+            for entry in data:
+                if 'topics' in entry and isinstance(entry['topics'], list):
+                    all_topics.extend(entry['topics'])
+            
+            logger.info(f"Extracted {len(all_topics)} topics from the JSON structure")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON: {str(e)}")
+            raise
+            
+        # For now, we don't have an overview, so return an empty string
+        overview = ""
         
-        # Extract bullet points (lines starting with - or *)
-        bullet_points = re.findall(r'^(?:[-*]\s+.+)(?:\n\s+.*)*', content, flags=re.MULTILINE)
-        
-        # Clean up bullet points
-        bullet_points = [point.strip() for point in bullet_points if point.strip()]
-        
-        logger.info(f"Extracted {len(bullet_points)} bullet points from summary")
-        return overview, bullet_points
+        return overview, all_topics
     
+    def split_long_message(self, message: str) -> List[str]:
+        """
+        Split a long message into smaller chunks to comply with Discord's character limit.
+        
+        Args:
+            message: The message to split
+            
+        Returns:
+            List of message chunks, each within the character limit
+        """
+        if len(message) <= self.MAX_MESSAGE_LENGTH:
+            return [message]
+        
+        chunks = []
+        current_chunk = ""
+        
+        # Split by lines first for more natural breaks
+        lines = message.split('\n')
+        
+        for line in lines:
+            # If adding this line would exceed the limit, store current chunk and start a new one
+            if len(current_chunk) + len(line) + 1 > self.MAX_MESSAGE_LENGTH:
+                # If the line itself is too long, we need to split it
+                if len(line) > self.MAX_MESSAGE_LENGTH:
+                    # If current chunk is not empty, add it to chunks
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                        current_chunk = ""
+                    
+                    # Split the long line into chunks
+                    remaining = line
+                    while remaining:
+                        # Find a good breaking point (space) near the limit
+                        break_point = self.MAX_MESSAGE_LENGTH
+                        if len(remaining) > self.MAX_MESSAGE_LENGTH:
+                            # Try to find the last space before the limit
+                            last_space = remaining[:self.MAX_MESSAGE_LENGTH].rfind(' ')
+                            if last_space > 0:  # If space found, break there
+                                break_point = last_space + 1
+                        
+                        chunks.append(remaining[:break_point])
+                        remaining = remaining[break_point:]
+                else:
+                    # Current chunk is full, add it to chunks and start new with this line
+                    chunks.append(current_chunk)
+                    current_chunk = line
+            else:
+                # Add line to current chunk
+                if current_chunk:
+                    current_chunk += '\n' + line
+                else:
+                    current_chunk = line
+        
+        # Add the last chunk if it's not empty
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks
+    
+    def format_topic(self, topic_data: Dict[str, Any]) -> str:
+        """
+        Format a topic dictionary into a readable Discord message.
+        
+        Args:
+            topic_data: Dictionary containing topic information
+            
+        Returns:
+            Formatted string for Discord message
+        """
+        # Check which format the topic is in based on keys
+        if 'topic' in topic_data:
+            # Start with the topic title
+            message = f"**{topic_data['topic']}**"
+            
+            # Add sources on the same line if available
+            if 'sources' in topic_data and isinstance(topic_data['sources'], list) and topic_data['sources']:
+                message += "  -  "
+                source_links = []
+                for i, source in enumerate(topic_data['sources']):
+                    # Create markdown link format for Discord
+                    source_links.append(f"[Source]({source})")
+                
+                message += " | ".join(source_links)
+            
+            # Add a blank line before details
+            message += "\n\n"
+            
+            # Handle 'details' array (always present, even if just one item)
+            if 'details' in topic_data and isinstance(topic_data['details'], list):
+                for detail in topic_data['details']:
+                    message += f"     • {detail}\n"
+            else:
+                # Fallback in case the format is unexpected
+                message += "     No details provided for this topic.\n"
+            
+            # Add an extra blank line at the end to ensure separation between topics
+            message += "\u200B"
+                    
+            return message
+            
+        # Fall back to just returning the data as a formatted string if structure is unknown
+        return f"**Topic Information**\n\n{json.dumps(topic_data, indent=2)}\n\n"
+        
     async def publish_summary(self, file_path: str, include_overview: bool = True, delay: float = 1.0) -> Dict[str, Any]:
         """
         Publish a summary to Discord.
@@ -136,30 +254,50 @@ class SummaryPublisher:
         logger.info(f"Publishing to channel #{channel.name} in server {server.name}")
         
         # Parse the summary file
-        overview, bullet_points = await self.parse_summary_file(file_path)
+        overview, topics = await self.parse_summary_file(file_path)
         
         # Stats to track the operation
         stats = {
             'messages_sent': 0,
-            'bullet_points_sent': 0,
+            'topics_sent': 0,
             'errors': 0
         }
         
         try:
             # Send the overview if requested
             if include_overview and overview:
-                await channel.send(overview)
-                stats['messages_sent'] += 1
-                await asyncio.sleep(delay)  # Pause to avoid rate limiting
+                # If overview is too long, split it
+                if len(overview) > self.MAX_MESSAGE_LENGTH:
+                    overview_chunks = self.split_long_message(overview)
+                    for chunk in overview_chunks:
+                        await channel.send(chunk)
+                        stats['messages_sent'] += 1
+                        await asyncio.sleep(delay)
+                else:
+                    await channel.send(overview)
+                    stats['messages_sent'] += 1
+                    await asyncio.sleep(delay)
             
-            # Send each bullet point
-            for bullet in bullet_points:
-                await channel.send(bullet)
-                stats['messages_sent'] += 1
-                stats['bullet_points_sent'] += 1
-                await asyncio.sleep(delay)  # Pause to avoid rate limiting
+            # Send each topic
+            for topic_data in topics:
+                # Format the topic into a readable message
+                formatted_topic = self.format_topic(topic_data)
+                
+                # If topic is too long, split it
+                if len(formatted_topic) > self.MAX_MESSAGE_LENGTH:
+                    topic_chunks = self.split_long_message(formatted_topic)
+                    for chunk in topic_chunks:
+                        await channel.send(chunk)
+                        stats['messages_sent'] += 1
+                        await asyncio.sleep(delay)
+                else:
+                    await channel.send(formatted_topic)
+                    stats['messages_sent'] += 1
+                    await asyncio.sleep(delay)
+                
+                stats['topics_sent'] += 1
             
-            logger.info(f"Successfully sent {stats['bullet_points_sent']} bullet points")
+            logger.info(f"Successfully sent {stats['topics_sent']} topics in {stats['messages_sent']} messages")
         
         except discord.errors.Forbidden:
             error_msg = f"Bot doesn't have permission to send messages to channel #{channel.name}"
@@ -220,7 +358,7 @@ def parse_args():
     parser.add_argument(
         "summary_path",
         type=str,
-        help="Path to the summary markdown file"
+        help="Path to the summary JSON file"
     )
     
     parser.add_argument(
@@ -258,7 +396,7 @@ async def run_publisher(args):
         
         print("\nSummary Publishing Complete!")
         print(f"Messages sent: {stats['messages_sent']}")
-        print(f"Bullet points sent: {stats['bullet_points_sent']}")
+        print(f"Topics sent: {stats['topics_sent']}")
         if stats['errors'] > 0:
             print(f"Errors encountered: {stats['errors']}")
     except Exception as e:

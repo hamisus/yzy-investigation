@@ -463,7 +463,7 @@ def discord_daily_recap(
 
 def discord_publish_summary(
     summary_path: Path,
-    test_mode: bool = False,
+    test_mode: bool = True,
     include_overview: bool = True,
     delay: float = 1.0,
     verbose: bool = False
@@ -507,7 +507,7 @@ def discord_publish_summary(
             
             print("\nSummary Publishing Complete!")
             print(f"Messages sent: {stats['messages_sent']}")
-            print(f"Bullet points sent: {stats['bullet_points_sent']}")
+            print(f"Topics sent: {stats['topics_sent']}")
             if stats['errors'] > 0:
                 print(f"Errors encountered: {stats['errors']}")
                 
