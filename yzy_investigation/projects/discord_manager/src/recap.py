@@ -18,6 +18,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
+import argparse
+import re
 
 import discord
 from discord.ext import commands
@@ -33,7 +35,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Path to our simple JSON file that stores the last summary time
-STATE_FILE = "recap_state.json"
+STATE_FILE = Path(__file__).parent.parent / "data" / "recap_state.json"
 
 # Constants
 OPENAI_TIMEOUT = 60  # seconds
@@ -43,7 +45,7 @@ MAX_CONCURRENT_CHUNKS = 3  # Maximum number of chunks to process in parallel
 
 
 class RecapBot(commands.Bot):
-    def __init__(self, test_mode: bool = False, **kwargs):
+    def __init__(self, test_mode: bool = False, start_time: Optional[datetime] = None, **kwargs):
         # Give it a prefix (we won't actually use commands, but needed for Bot init)
         intents = discord.Intents.default()
         intents.message_content = True
@@ -52,6 +54,9 @@ class RecapBot(commands.Bot):
         kwargs['heartbeat_timeout'] = 150.0  # Increase from default 60s
         super().__init__(command_prefix="!", intents=intents, **kwargs)
 
+        # Store the custom start time if provided
+        self.custom_start_time = start_time
+        
         # Source channel is always from production
         self.source_channel_id = int(os.getenv("DISCORD_SOURCE_CHANNEL_ID", "0"))
         self.server_id = int(os.getenv("DISCORD_SERVER_ID", "0"))
@@ -470,7 +475,17 @@ class RecapBot(commands.Bot):
             logger.info(f"Merge token usage - Prompt: {response['usage']['prompt_tokens']}, Completion: {response['usage']['completion_tokens']}")
             logger.info(f"Merge cost: ${cost:.4f}")
 
-            content = response['choices'][0]['message']['content'].strip()
+            # Check if we got a function call response or direct content
+            if 'function_call' in response['choices'][0]['message']:
+                content = response['choices'][0]['message']['function_call']['arguments']
+            else:
+                content = response['choices'][0]['message'].get('content')
+                
+            if not content:
+                logger.error("No content received from API")
+                return json.dumps(all_topics, indent=2)
+                
+            content = content.strip()
             
             # Validate JSON and ensure it's an array
             try:
@@ -548,30 +563,151 @@ class RecapBot(commands.Bot):
             # Parse the JSON summary
             summary_data = json.loads(summary_text)
             
-            # Create a formatted message for each topic
-            for topic in summary_data:
+            # Format the time range description
+            start_time = self.custom_start_time or (
+                datetime.now(timezone.utc) - timedelta(days=1) if self.test_mode
+                else self.last_summary_time
+            )
+            
+            # Format the start time in a readable way
+            if start_time.date() == datetime.now(timezone.utc).date():
+                time_str = start_time.strftime("%I:%M %p UTC")
+                time_range = f"today since {time_str}"
+            else:
+                time_str = start_time.strftime("%B %d, %Y at %I:%M %p UTC")
+                time_range = f"since {time_str}"
+            
+            # Create a header embed
+            header_embed = discord.Embed(
+                title="📋 Recap",
+                description=f"A summary of {len(summary_data)} discussion topics from {time_range}:",
+                color=discord.Color.blue(),
+                timestamp=datetime.now(timezone.utc)
+            )
+            await channel.send(embed=header_embed)
+            
+            # Create formatted message for each topic
+            for i, topic in enumerate(summary_data, 1):
+                # Choose emoji and color based on topic type
+                topic_type, color = self._get_topic_theme(topic["topic"])
+                
+                # Create embed for this topic
                 embed = discord.Embed(
-                    title=topic["topic"],
-                    color=discord.Color.blue()
+                    title=f"{topic_type} {topic['topic']}",
+                    color=color
                 )
                 
-                # Add details as bullet points
-                details = "\n".join(f"• {detail}" for detail in topic["details"])
-                if details:
-                    embed.add_field(name="Details", value=details, inline=False)
+                # Add details as bullet points with consistent formatting
+                details_text = "\n".join(f"• {detail}" for detail in topic["details"])
+                if details_text:
+                    embed.add_field(name="Details", value=details_text, inline=False)
                 
-                # Add sources as links if any
+                # Add sources as a clean list of links
                 if topic["sources"]:
-                    sources = "\n".join(f"[Link]({source})" for source in topic["sources"])
-                    embed.add_field(name="Sources", value=sources, inline=False)
+                    source_links = []
+                    for j, source in enumerate(topic["sources"], 1):
+                        source_links.append(f"[Message {j}]({source})")
+                    
+                    sources_text = " • ".join(source_links)
+                    if len(sources_text) > 1024:  # Discord's field value limit
+                        sources_text = " • ".join(source_links[:3]) + " • ..."
+                    
+                    embed.add_field(
+                        name="🔗 Sources",
+                        value=sources_text,
+                        inline=False
+                    )
+                
+                # Add footer showing correct topic number
+                embed.set_footer(text=f"Topic {i} of {len(summary_data)}")
                 
                 await channel.send(embed=embed)
                 
         except json.JSONDecodeError:
             # Fallback to simple text chunks if JSON parsing fails
+            logger.error("Failed to parse summary JSON, falling back to text chunks")
             chunks = self._split_into_discord_chunks(summary_text, max_chars=2000)
             for chunk in chunks:
                 await channel.send(chunk)
+
+    def _get_topic_theme(self, topic_title: str) -> Tuple[str, discord.Color]:
+        """
+        Get the appropriate emoji and color for a topic based on its content.
+        
+        Args:
+            topic_title: The topic title to analyze
+            
+        Returns:
+            Tuple of (emoji, color)
+        """
+        # Convert to lowercase for matching
+        title = topic_title.lower()
+        
+        # Define theme patterns
+        themes = [
+            # Discussions and Speculation
+            {
+                "keywords": ["discuss", "debate", "conversation", "speculation", "theory"],
+                "emoji": "💭",
+                "color": discord.Color.blue()
+            },
+            # Announcements and Updates
+            {
+                "keywords": ["announce", "update", "news", "release"],
+                "emoji": "📢",
+                "color": discord.Color.green()
+            },
+            # Warnings and Issues
+            {
+                "keywords": ["warn", "issue", "problem", "error", "bug", "scam", "concern"],
+                "emoji": "⚠️",
+                "color": discord.Color.red()
+            },
+            # Questions and Help
+            {
+                "keywords": ["question", "help", "support", "how to"],
+                "emoji": "❓",
+                "color": discord.Color.gold()
+            },
+            # Community and Social
+            {
+                "keywords": ["community", "social", "member", "group", "team"],
+                "emoji": "👥",
+                "color": discord.Color.purple()
+            },
+            # Technical and Development
+            {
+                "keywords": ["technical", "dev", "code", "implementation", "feature"],
+                "emoji": "⚙️",
+                "color": discord.Color.dark_grey()
+            },
+            # Investment and Trading
+            {
+                "keywords": ["invest", "trade", "price", "market", "coin", "token"],
+                "emoji": "📈",
+                "color": discord.Color.green()
+            },
+            # Events and Activities
+            {
+                "keywords": ["event", "activity", "meeting", "space", "twitter"],
+                "emoji": "📅",
+                "color": discord.Color.blue()
+            },
+            # Humor and Fun
+            {
+                "keywords": ["joke", "humor", "fun", "banter", "laugh"],
+                "emoji": "😄",
+                "color": discord.Color.gold()
+            }
+        ]
+        
+        # Find matching theme
+        for theme in themes:
+            if any(keyword in title for keyword in theme["keywords"]):
+                return theme["emoji"], theme["color"]
+        
+        # Default theme
+        return "📌", discord.Color.blue()
 
     def _split_into_discord_chunks(self, text: str, max_chars: int = 2000) -> List[str]:
         """Split text into smaller strings that fit within Discord's message limit."""
@@ -628,8 +764,11 @@ class RecapBot(commands.Bot):
         logger.info(f"Source: #{source_channel.name} in {source_guild.name}")
         logger.info(f"Target: #{target_channel.name} in {target_guild.name}")
 
-        # In test mode, always use last 24 hours
-        if self.test_mode:
+        # Determine the effective start time
+        if self.custom_start_time:
+            effective_after = self.custom_start_time
+            logger.info(f"Using custom start time: {effective_after}")
+        elif self.test_mode:
             effective_after = datetime.now(timezone.utc) - timedelta(days=1)
             logger.info(f"Test mode: Using last 24 hours (after {effective_after})")
         else:
@@ -677,7 +816,56 @@ class RecapBot(commands.Bot):
         await self.close()
 
 
-async def run_recap(test_mode: bool = False):
+def parse_time_arg(time_str: str) -> datetime:
+    """Parse a time argument string into a datetime object.
+    
+    Supports formats like:
+    - "7d" for 7 days ago
+    - "24h" for 24 hours ago
+    - "YYYY-MM-DD" for a specific date
+    - "YYYY-MM-DD HH:MM" for a specific date and time
+    
+    Args:
+        time_str: The time string to parse
+        
+    Returns:
+        datetime: The parsed datetime in UTC
+        
+    Raises:
+        ValueError: If the time string format is invalid
+    """
+    # Check for relative time formats (e.g., "7d", "24h")
+    relative_match = re.match(r"^(\d+)([dh])$", time_str)
+    if relative_match:
+        amount = int(relative_match.group(1))
+        unit = relative_match.group(2)
+        
+        if unit == "d":
+            delta = timedelta(days=amount)
+        else:  # unit == "h"
+            delta = timedelta(hours=amount)
+            
+        return datetime.now(timezone.utc) - delta
+    
+    # Try parsing as exact date/time
+    try:
+        # Try full datetime format first
+        dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        try:
+            # Try date-only format
+            dt = datetime.strptime(time_str, "%Y-%m-%d")
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise ValueError(
+                "Invalid time format. Use one of:\n"
+                "- Relative time: '7d' for 7 days, '24h' for 24 hours\n"
+                "- Exact date: 'YYYY-MM-DD'\n"
+                "- Exact datetime: 'YYYY-MM-DD HH:MM'"
+            )
+
+async def run_recap(test_mode: bool = False, start_time: Optional[str] = None):
     """
     Main async entry point. Creates and runs the bot until it finishes.
     
@@ -685,24 +873,51 @@ async def run_recap(test_mode: bool = False):
         test_mode: If True, summaries will be posted to test server/channel.
                   If False, summaries go to production server/channel.
                   Source messages are always pulled from production.
+        start_time: Optional string specifying when to start the summary from.
+                   Supports formats like "7d", "24h", "YYYY-MM-DD", "YYYY-MM-DD HH:MM"
     """
     bot_token = os.getenv("DISCORD_BOT_TOKEN", "")
     if not bot_token:
         raise ValueError("DISCORD_BOT_TOKEN not found in .env")
 
-    bot = RecapBot(test_mode=test_mode)
+    # Parse start_time if provided
+    custom_start = None
+    if start_time:
+        try:
+            custom_start = parse_time_arg(start_time)
+        except ValueError as e:
+            logger.error(f"Invalid start time format: {e}")
+            return
+
+    bot = RecapBot(test_mode=test_mode, start_time=custom_start)
     await bot.start(bot_token)
 
 
 def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Generate Discord channel summaries")
+    parser.add_argument("--test", action="store_true", help="Run in test mode")
+    parser.add_argument(
+        "--start", 
+        type=str,
+        help=(
+            "When to start the summary from. Formats:\n"
+            "- Relative time: '7d' for 7 days, '24h' for 24 hours\n"
+            "- Exact date: 'YYYY-MM-DD'\n"
+            "- Exact datetime: 'YYYY-MM-DD HH:MM'"
+        )
+    )
+    
+    args = parser.parse_args()
+    
     # Load environment variables
     load_dotenv()
     
-    # Check for test mode flag
-    test_mode = os.getenv("TEST_MODE", "").lower() == "true"
+    # Check for test mode flag (either from args or env)
+    test_mode = args.test or os.getenv("TEST_MODE", "").lower() == "true"
     
     # Run the bot
-    asyncio.run(run_recap(test_mode=test_mode))
+    asyncio.run(run_recap(test_mode=test_mode, start_time=args.start))
 
 
 if __name__ == "__main__":
