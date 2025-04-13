@@ -351,7 +351,7 @@ class RecapBot(commands.Bot):
         CRITICAL: For message URLs:
         - Extract message IDs from the <!-- msg:ID --> comments
         - Use this exact format: https://discord.com/channels/{self.server_id}/{self.source_channel_id}/MESSAGE_ID
-        - Include at least one source URL per topic
+        - Include at least one source URL per topic. Include all source urls for all relevant messages.
         - Example URL: https://discord.com/channels/{self.server_id}/{self.source_channel_id}/1234567890
         
         Example output format with SPECIFIC details:
@@ -481,24 +481,32 @@ class RecapBot(commands.Bot):
             return json.dumps(all_topics, indent=2)
 
         # For large numbers of topics, do recursive merging
-        MAX_TOPICS_PER_MERGE = 20  # Maximum number of topics to merge in one API call
+        MAX_TOPICS_PER_MERGE = 10  # Maximum number of topics to merge in one API call
         
         async def merge_topic_batch(topics: List[dict]) -> List[dict]:
             topics_json = json.dumps(topics, indent=2)
             
             system_prompt = """You are merging multiple topic summaries into a cohesive final summary.
             Your task is to:
-            1. Combine related topics
+            1. Combine related topics into single comprehensive topics
             2. Organize information chronologically where relevant
-            3. Remove redundant information
+            3. Remove redundant information while preserving ALL unique details
             4. Ensure all important points are preserved
-            5. Maintain all relevant source links
+            5. Maintain ALL source links - never discard any message URLs
+            6. Update timestamp ranges for merged topics
             
             The output must be a valid JSON array with multiple topic objects.
-            Each topic must have:
-            - 'topic': A clear, descriptive title
-            - 'details': An array of bullet points
-            - 'sources': An array of message URLs
+            Each topic MUST have these exact fields:
+            - 't': A clear, descriptive title (string, max 100 chars)
+            - 'd': An array of bullet points with ALL important details preserved
+                  - Each bullet point must be 200 chars or less
+                  - Limit to 5 most important points if there are too many
+                  - Focus on unique, concrete information
+            - 's': An array of ALL relevant message URLs - never discard any URLs
+                  When merging topics, include ALL source URLs from both topics
+            - 'ts': Array with [earliest_timestamp, latest_timestamp] from ALL merged topics
+                   When merging topics, use the earliest timestamp from any topic as the start
+                   and the latest timestamp from any topic as the end
             """
 
             user_prompt = f"""Here are the topics to merge:
@@ -507,11 +515,21 @@ class RecapBot(commands.Bot):
             ----------------
 
             Create a final JSON array that combines related topics and organizes the information clearly.
-            - Combine topics that discuss the same subject
-            - Keep the topics distinct and focused
-            - Preserve all important information
-            - Maintain all source links
-            - Aim for 5-10 well-organized topics
+            Requirements:
+            1. When merging related topics:
+               - Combine ALL unique details into the 'd' array
+               - Keep each detail point under 200 characters
+               - If too many details, keep only the 5 most important ones
+               - Include ALL source URLs in the 's' array - never discard any URLs
+               - When merging topics, combine ALL source URLs from both topics
+               - Update 'ts' array to span the full time range
+            2. Keep topics focused and distinct:
+               - Only merge topics that are truly about the same subject
+               - Don't force unrelated topics together
+            3. Structure:
+               - Use short field names: 't', 'd', 's', 'ts'
+               - Ensure each topic has all required fields
+               - Aim for 5-10 well-organized topics
             """
 
             try:
@@ -699,9 +717,6 @@ class RecapBot(commands.Bot):
     async def _post_summary(self, channel: discord.TextChannel, summary_text: str):
         """Post the summary text to the given channel, splitting if necessary."""
         try:
-            # Log the raw summary for debugging
-            logger.debug(f"Raw summary text: {summary_text}")
-            
             # Parse the JSON summary and handle nested structure
             try:
                 raw_data = json.loads(summary_text)
@@ -713,7 +728,7 @@ class RecapBot(commands.Bot):
                 for chunk in chunks:
                     await channel.send(chunk)
                 return
-            
+
             # Extract topics from nested structure if necessary
             try:
                 if isinstance(raw_data, list) and len(raw_data) == 1 and 'topics' in raw_data[0]:
@@ -728,7 +743,7 @@ class RecapBot(commands.Bot):
             except Exception as e:
                 logger.error(f"Failed to process summary data structure: {e}")
                 return
-            
+
             # Format the time range description
             start_time = self.custom_start_time or (
                 datetime.now(timezone.utc) - timedelta(days=1) if self.test_mode
@@ -786,8 +801,34 @@ class RecapBot(commands.Bot):
                     
                     # Add details as bullet points with consistent formatting
                     if topic["d"]:
-                        details_text = "\n".join(f"• {detail}" for detail in topic["d"])
-                        embed.add_field(name="Details", value=details_text, inline=False)
+                        # Split details into chunks if needed to stay under Discord's limit
+                        details = topic["d"]
+                        current_chunk = []
+                        current_length = 0
+                        chunks = []
+                        
+                        for detail in details:
+                            # Add bullet point if not already present
+                            if not detail.startswith('•'):
+                                detail = f"• {detail}"
+                                
+                            # If adding this detail would exceed limit, start new chunk
+                            if current_length + len(detail) + 1 > 1024:  # +1 for newline
+                                if current_chunk:
+                                    chunks.append("\n".join(current_chunk))
+                                current_chunk = [detail]
+                                current_length = len(detail)
+                            else:
+                                current_chunk.append(detail)
+                                current_length += len(detail) + 1  # +1 for newline
+                        
+                        if current_chunk:
+                            chunks.append("\n".join(current_chunk))
+                        
+                        # Add chunks as separate fields
+                        for j, chunk in enumerate(chunks):
+                            field_name = "Details" if j == 0 else f"Details (continued {j+1})"
+                            embed.add_field(name=field_name, value=chunk, inline=False)
                     
                     # Add sources as a clean list of links
                     if topic["s"]:
@@ -795,15 +836,33 @@ class RecapBot(commands.Bot):
                         for j, source in enumerate(topic["s"], 1):
                             source_links.append(f"[Message {j}]({source})")
                         
-                        sources_text = " • ".join(source_links)
-                        if len(sources_text) > 1024:  # Discord's field value limit
-                            sources_text = " • ".join(source_links[:3]) + " • ..."
+                        # Split sources into chunks if needed
+                        sources_chunks = []
+                        current_chunk = []
+                        current_length = 0
                         
-                        embed.add_field(
-                            name="🔗 Sources",
-                            value=sources_text,
-                            inline=False
-                        )
+                        for link in source_links:
+                            # If adding this link would exceed limit, start new chunk
+                            if current_length + len(link) + 3 > 1024:  # +3 for " • "
+                                if current_chunk:
+                                    sources_chunks.append(" • ".join(current_chunk))
+                                current_chunk = [link]
+                                current_length = len(link)
+                            else:
+                                current_chunk.append(link)
+                                current_length += len(link) + 3  # +3 for " • "
+                        
+                        if current_chunk:
+                            sources_chunks.append(" • ".join(current_chunk))
+                        
+                        # Add chunks as separate fields
+                        for j, chunk in enumerate(sources_chunks):
+                            field_name = "🔗 Sources" if j == 0 else f"🔗 Sources (continued {j+1})"
+                            embed.add_field(
+                                name=field_name,
+                                value=chunk,
+                                inline=False
+                            )
                     
                     # Add footer showing correct topic number
                     embed.set_footer(text=f"Topic {i} of {len(summary_data)}")
